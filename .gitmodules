@@ -1,9 +1,11 @@
 [submodule "dependencies/submodules/delta-studio"]
 	path = dependencies/submodules/delta-studio
-	url = https://github.com/ange-yaghi/delta-studio
+	url = https://github.com/AZERK0/delta-studio
+	branch = sdl-build
 [submodule "dependencies/submodules/simple-2d-constraint-solver"]
 	path = dependencies/submodules/simple-2d-constraint-solver
-	url = https://github.com/ange-yaghi/simple-2d-constraint-solver
+	url = https://github.com/bobsayshilol/simple-2d-constraint-solver
+	branch = gcc-fixes
 [submodule "dependencies/submodules/direct-to-video"]
 	path = dependencies/submodules/direct-to-video
 	url = https://github.com/ange-yaghi/direct-to-video
@@ -12,7 +14,8 @@
 	url = https://github.com/ange-yaghi/csv-io
 [submodule "dependencies/submodules/piranha"]
 	path = dependencies/submodules/piranha
-	url = https://github.com/ange-yaghi/piranha.git
+	url = https://github.com/bobsayshilol/piranha
+	branch = sdl-build
 [submodule "dependencies/discord"]
 	path = dependencies/discord
 	url = https://github.com/discord/discord-rpc.git

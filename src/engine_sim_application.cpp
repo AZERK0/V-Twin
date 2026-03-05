@@ -110,6 +110,10 @@ void EngineSimApplication::initialize(void *instance, ysContextObject::DeviceAPI
         m_dataRoot = ENGINE_SIM_DATA_ROOT;
     }
 
+    if (!m_dataRoot.IsAbsolute()) {
+        m_dataRoot = modulePath.Append(m_dataRoot).GetAbsolute();
+    }
+
     // Grab the userdata folder (input files that aren't from fixed data)
     if (getenv("XDG_DATA_HOME") != nullptr) {
         m_userData = getenv("XDG_DATA_HOME");
@@ -220,7 +224,9 @@ void EngineSimApplication::initialize() {
         m_engine.GetAudioDevice()->CreateBuffer(&params, 44100);
 
     m_audioSource = m_engine.GetAudioDevice()->CreateSource(m_outputAudioBuffer);
-    m_audioSource->SetMode((m_simulator->getEngine() != nullptr)
+    const bool hasLoadedEngine =
+        (m_simulator != nullptr && m_simulator->getEngine() != nullptr);
+    m_audioSource->SetMode(hasLoadedEngine
         ? ysAudioSource::Mode::Loop
         : ysAudioSource::Mode::Stop);
     m_audioSource->SetPan(0.0f);
@@ -388,6 +394,10 @@ float EngineSimApplication::unitsToPixels(float units) const {
 }
 
 void EngineSimApplication::run() {
+    if (m_simulator == nullptr) {
+        return;
+    }
+
     while (true) {
         m_engine.StartFrame();
 
@@ -399,7 +409,7 @@ void EngineSimApplication::run() {
         if (m_engine.ProcessKeyDown(ysKey::Code::Return)) {
             m_audioSource->SetMode(ysAudioSource::Mode::Stop);
             loadScript();
-            if (m_simulator->getEngine() != nullptr) {
+            if (m_simulator != nullptr && m_simulator->getEngine() != nullptr) {
                 m_audioSource->SetMode(ysAudioSource::Mode::Loop);
             }
         }
@@ -461,7 +471,9 @@ void EngineSimApplication::run() {
         stopRecording();
     }
 
-    m_simulator->endAudioRenderingThread();
+    if (m_simulator != nullptr) {
+        m_simulator->endAudioRenderingThread();
+    }
 }
 
 void EngineSimApplication::destroy() {
@@ -473,7 +485,11 @@ void EngineSimApplication::destroy() {
     m_assetManager.Destroy();
     m_engine.Destroy();
 
-    m_simulator->destroy();
+    if (m_simulator != nullptr) {
+        m_simulator->destroy();
+        delete m_simulator;
+        m_simulator = nullptr;
+    }
     m_audioBuffer.destroy();
 
     m_geometryGenerator.destroy();
@@ -506,18 +522,21 @@ void EngineSimApplication::loadEngine(
         delete m_iceEngine;
     }
 
+    if (engine == nullptr || vehicle == nullptr || transmission == nullptr) {
+        m_iceEngine = nullptr;
+        m_vehicle = nullptr;
+        m_transmission = nullptr;
+        m_simulator = nullptr;
+        m_viewParameters.Layer1 = 0;
+
+        return;
+    }
+
     m_iceEngine = engine;
     m_vehicle = vehicle;
     m_transmission = transmission;
 
     m_simulator = engine->createSimulator(vehicle, transmission);
-
-    if (engine == nullptr || vehicle == nullptr || transmission == nullptr) {
-        m_iceEngine = nullptr;
-        m_viewParameters.Layer1 = 0;
-
-        return;
-    }
 
     createObjects(engine);
 
@@ -705,6 +724,12 @@ void EngineSimApplication::loadScript() {
         break;
     }
 #endif /* ATG_ENGINE_SIM_PIRANHA_ENABLED */
+
+    if (engine == nullptr) {
+        if (vehicle != nullptr) delete vehicle;
+        if (transmission != nullptr) delete transmission;
+        return;
+    }
 
     if (vehicle == nullptr) {
         Vehicle::Parameters vehParams;
