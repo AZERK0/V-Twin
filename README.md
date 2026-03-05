@@ -53,33 +53,46 @@ The RPM hold feature will hold the engine at a specific RPM and also measure the
 I wrote this to demo in a [YouTube video](https://youtu.be/RKT-sKtR970), not as a real product. If you would like it to become a usable product please reach out to me or join my Discord (link can be found in the description of the aforementioned YouTube video). I use this codebase for my own purposes and so it might change frequently and without warning.
 
 ## How do I build it? (Ignore this section if you're not a developer!)
-**Note: this project currently only builds on Windows!**
 
-### Step 1 - Clone the repository
-```git clone --recurse-submodules https://github.com/ange-yaghi/engine-sim```
+### Linux quickstart (recommended)
 
-### Step 2 - Install CMake
-Install the latest version of CMake [here](https://cmake.org/) if it's not already installed.
+The repository now includes an automated Linux workflow with scripts, Make recipes, and CMake presets.
 
-### Step 3 - Install Dependencies
-You will need to install the following dependencies and CMake will need to be able to locate them (ie. they need to be listed on your PATH):
+Install dependencies with your distro package manager:
 
-    1. SDL2
-    2. SDL2_image
-    3. Boost (make sure to build the optional dependencies)
-    4. Flex and Bison
+1. SDL2
+2. SDL2_image
+3. Boost
+4. Flex and Bison
+5. CMake
 
-### Step 4 - Build and Run
-From the root directory of the project, run the following commands:
+From the project root:
 
-```
-mkdir build
-cd build
-cmake ..
-cmake --build .
+```bash
+make bootstrap
+make configure
+make build
+make run
 ```
 
-If these steps are successful, a Visual Studio solution will be generated in ```build```. You can open this project with Visual Studio and then run the ```engine-sim-app``` project. If you encounter an error telling you that you're missing DLLs, you will have to copy those DLLs to your EXE's directory.
+Useful shortcuts:
+
+```bash
+make build-debug   # configure + build debug preset
+make test          # bootstrap + configure + build + ctest
+```
+
+Direct preset-based commands are also available:
+
+```bash
+cmake --preset linux-release
+cmake --build --preset build-release
+ctest --preset test-release
+```
+
+### Windows
+
+Windows build support is still available through CMake/Visual Studio. The Linux automation does not remove the existing Windows path.
 
 ## Patreon Supporters
 
