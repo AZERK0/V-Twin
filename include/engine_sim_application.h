@@ -84,7 +84,7 @@ class EngineSimApplication {
         int getScreenWidth() const { return m_screenWidth; }
         int getScreenHeight() const { return m_screenHeight; }
 
-        Simulator *getSimulator() { return &m_simulator; }
+        Simulator *getSimulator() { return m_simulator; }
         InfoCluster *getInfoCluster() { return m_infoCluster; }
         ApplicationSettings* getAppSettings() { return &m_applicationSettings; }
 
@@ -108,6 +108,7 @@ class EngineSimApplication {
         virtual void process(float dt);
         virtual void render();
 
+        float m_displayAngle;
         float m_displayHeight;
         int m_gameWindowHeight;
         int m_screenWidth;
@@ -119,6 +120,10 @@ class EngineSimApplication {
 
         dbasic::DeltaEngine m_engine;
         dbasic::AssetManager m_assetManager;
+
+        dbasic::Path m_dataRoot;
+        dbasic::Path m_userData;
+        dbasic::Path m_outputPath;
 
         std::string m_assetPath;
 
@@ -133,7 +138,7 @@ class EngineSimApplication {
         Engine *m_iceEngine;
         Vehicle *m_vehicle;
         Transmission *m_transmission;
-        Simulator m_simulator;
+        Simulator *m_simulator;
         double m_dynoSpeed;
         double m_torque;
 
@@ -182,6 +187,8 @@ class EngineSimApplication {
 
         int m_oscillatorSampleOffset;
         int m_screen;
+
+        struct LoggingErrorHandler *m_error_handler;
 
 #ifdef ATG_ENGINE_SIM_VIDEO_CAPTURE
         atg_dtv::Encoder m_encoder;

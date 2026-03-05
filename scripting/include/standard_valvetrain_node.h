@@ -28,15 +28,15 @@ namespace es_script {
             m_exhaustCamshaft->generate(exhaustCam, crank, context);
 
             StandardValvetrain::Parameters params;
-            params.IntakeCamshaft = intakeCam;
-            params.ExhaustCamshaft = exhaustCam;
+            params.intakeCamshaft = intakeCam;
+            params.exhaustCamshaft = exhaustCam;
             valvetrain->initialize(params);
 
             return valvetrain;
         }
 
     protected:
-        virtual void registerInputs() {
+        virtual void registerInputs() override {
             addInput("intake_camshaft", &m_intakeCamshaft, InputTarget::Type::Object);
             addInput("exhaust_camshaft", &m_exhaustCamshaft, InputTarget::Type::Object);
 
