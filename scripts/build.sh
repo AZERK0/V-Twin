@@ -13,8 +13,18 @@ case "$BUILD_PRESET" in
 esac
 
 if [[ -d "$RUNTIME_DIR" ]]; then
-  cat > "$RUNTIME_DIR/delta.conf" <<'EOF'
+  case "$RUNTIME_DIR" in
+    */build/linux-release|*/build/linux-debug)
+      cat > "$RUNTIME_DIR/delta.conf" <<'EOF'
+../../dependencies/submodules/delta-studio/engines/basic
+../../assets
+EOF
+      ;;
+    *)
+      cat > "$RUNTIME_DIR/delta.conf" <<'EOF'
 ../dependencies/submodules/delta-studio/engines/basic
 ../assets
 EOF
+      ;;
+  esac
 fi

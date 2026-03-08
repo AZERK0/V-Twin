@@ -1,7 +1,12 @@
 #include "../include/engine_sim_application.h"
 
-static void runApp(void *handle, ysContextObject::DeviceAPI api) {
+#include <string>
+
+static void runApp(void *handle, ysContextObject::DeviceAPI api, const char *scriptPath = nullptr) {
     EngineSimApplication application;
+    if (scriptPath != nullptr) {
+        application.setScriptPathOverride(scriptPath);
+    }
     application.initialize(handle, api);
     application.run();
     application.destroy();
@@ -24,8 +29,14 @@ int WINAPI WinMain(
 }
 
 #else
-int main() {
-    runApp(nullptr, ysContextObject::DeviceAPI::OpenGL4_0);
+int main(int argc, char **argv) {
+    const char *scriptPath = nullptr;
+
+    if (argc == 3 && std::string(argv[1]) == "--script") {
+        scriptPath = argv[2];
+    }
+
+    runApp(nullptr, ysContextObject::DeviceAPI::OpenGL4_0, scriptPath);
     return 0;
 }
 

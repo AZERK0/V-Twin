@@ -696,19 +696,67 @@ void EngineSimApplication::loadScript() {
     dataPaths.push_back(m_userData.ToString());
     dataPaths.push_back(m_dataRoot.ToString());
 
-    for (const auto &dataPath : dataPaths) {
-        // Skip this path if the script doesn't exist
-        const auto script = dataPath.append("assets/main.mr");
-        if (!script.exists()) {
-            continue;
-        }
+    piranha::IrPath scriptPath;
+    bool scriptFound = false;
 
+    if (!m_scriptPathOverride.empty()) {
+        const piranha::IrPath overridePath(m_scriptPathOverride);
+        if (overridePath.exists()) {
+            scriptPath = overridePath;
+            scriptFound = true;
+        }
+        else {
+            for (const auto &dataPath : dataPaths) {
+                const auto candidate = dataPath.append(m_scriptPathOverride);
+                if (candidate.exists()) {
+                    scriptPath = candidate;
+                    scriptFound = true;
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        for (const auto &dataPath : dataPaths) {
+            const auto candidate = dataPath.append("assets/main.mr");
+            if (candidate.exists()) {
+                scriptPath = candidate;
+                scriptFound = true;
+                break;
+            }
+        }
+    }
+
+    if (scriptFound) {
         const auto outputLogPath = m_outputPath.Append("error_log.log").ToString();
         std::ofstream outputLog(outputLogPath, std::ios::out);
 
+        std::string compileScriptPath = scriptPath.toString();
+        if (!m_scriptPathOverride.empty()) {
+            std::string importPath = compileScriptPath;
+
+            const std::string assetsPrefix = m_dataRoot.Append("assets").ToString() + "/";
+            if (importPath.rfind(assetsPrefix, 0) == 0) {
+                importPath = importPath.substr(assetsPrefix.size());
+            }
+            else if (importPath.rfind("assets/", 0) == 0) {
+                importPath = importPath.substr(7);
+            }
+
+            compileScriptPath = m_outputPath.Append("script_override_main.mr").ToString();
+            std::ofstream overrideScript(compileScriptPath, std::ios::out);
+            overrideScript
+                << "import \"engine_sim.mr\"\n"
+                << "import \"themes/default.mr\"\n"
+                << "import \"" << importPath << "\"\n\n"
+                << "use_default_theme()\n"
+                << "main()\n";
+            overrideScript.close();
+        }
+
         es_script::Compiler compiler;
         compiler.initialize(searchPaths);
-        const bool compiled = compiler.compile(script.toString(), outputLog);
+        const bool compiled = compiler.compile(compileScriptPath, outputLog);
         if (compiled) {
             const es_script::Compiler::Output output = compiler.execute();
             configure(output.applicationSettings);
@@ -719,9 +767,6 @@ void EngineSimApplication::loadScript() {
         }
 
         compiler.destroy();
-
-        // Don't try any other scripts or we'd nuke the error log
-        break;
     }
 #endif /* ATG_ENGINE_SIM_PIRANHA_ENABLED */
 
