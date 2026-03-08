@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../include/synthesizer.h"
+#include "audio/synthesizer.h"
 
 #include <array>
 #include <chrono>

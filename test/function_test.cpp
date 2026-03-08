@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../include/function.h"
+#include "shared/function.h"
 
 #include <stdlib.h>
 

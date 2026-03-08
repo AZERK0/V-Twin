@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "../include/gas_system.h"
-#include "../include/units.h"
-#include "../include/csv_io.h"
+#include "domain/engine/gas_system.h"
+#include "units.h"
+#include "csv_io.h"
 
 #include <sstream>
 

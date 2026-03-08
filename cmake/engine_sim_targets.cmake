@@ -4,7 +4,9 @@ add_library(engine-sim STATIC
 )
 
 target_include_directories(engine-sim
-    PUBLIC dependencies/submodules
+    PUBLIC
+        include
+        dependencies/submodules
 )
 
 target_link_libraries(engine-sim
@@ -20,7 +22,10 @@ if (PIRANHA_ENABLED)
     )
 
     target_include_directories(engine-sim-script-interpreter
-        PUBLIC dependencies/submodules
+        PUBLIC
+            include
+            scripting/include
+            dependencies/submodules
     )
 
     target_link_libraries(engine-sim-script-interpreter
@@ -36,7 +41,10 @@ add_executable(engine-sim-app WIN32
 )
 
 target_include_directories(engine-sim-app
-    PUBLIC dependencies/submodules
+    PUBLIC
+        include
+        scripting/include
+        dependencies/submodules
 )
 
 target_link_libraries(engine-sim-app
@@ -57,8 +65,8 @@ endif()
 
 if (DISCORD_ENABLED)
     target_sources(engine-sim-app PUBLIC
-        src/discord.cpp
-        include/discord.h
+        src/integration/discord.cpp
+        include/integration/discord.h
     )
 
     target_include_directories(engine-sim-app PUBLIC
