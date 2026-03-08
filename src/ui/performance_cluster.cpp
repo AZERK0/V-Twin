@@ -1,7 +1,9 @@
 #include "ui/performance_cluster.h"
 
+#include "simulation/simulator.h"
 #include "units.h"
 #include "ui/gauge.h"
+#include "ui/labeled_gauge.h"
 #include "constants.h"
 #include "app/engine_sim_application.h"
 
@@ -9,7 +11,6 @@
 
 PerformanceCluster::PerformanceCluster() {
     m_simulator = nullptr;
-    m_timePerTimestepGauge = nullptr;
     m_timePerTimestepGauge = nullptr;
     m_fpsGauge = nullptr;
     m_simSpeedGauge = nullptr;

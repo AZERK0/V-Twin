@@ -1,6 +1,12 @@
 #include "app/engine_sim_application.h"
 
+#include "simulation/simulator.h"
 #include "shared/utilities.h"
+#include "ui/engine_view.h"
+#include "ui/info_cluster.h"
+#include "ui/oscilloscope_cluster.h"
+#include "ui/performance_cluster.h"
+#include "units.h"
 
 #include <delta-studio/include/yds_error_handler.h>
 

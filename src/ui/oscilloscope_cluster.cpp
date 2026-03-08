@@ -1,6 +1,9 @@
 #include "ui/oscilloscope_cluster.h"
 
 #include "app/engine_sim_application.h"
+#include "domain/engine/engine.h"
+#include "simulation/simulator.h"
+#include "ui/oscilloscope.h"
 
 #include <sstream>
 
@@ -100,7 +103,7 @@ void OscilloscopeCluster::initialize(EngineSimApplication *app) {
     m_intakeFlowScope->m_drawReverse = false;
     m_intakeFlowScope->i_color = m_app->getBlue();
 
-    // Cylinder molcules
+    // Cylinder molecules
     m_cylinderMoleculesScope->setBufferSize(1024);
     m_cylinderMoleculesScope->m_xMin = 0.0f;
     m_cylinderMoleculesScope->m_xMax = constants::pi * 4;

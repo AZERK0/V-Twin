@@ -1,7 +1,13 @@
 #include "ui/right_gauge_cluster.h"
 
+#include "ui/afr_cluster.h"
+#include "domain/vehicle/vehicle.h"
+#include "ui/firing_order_display.h"
+#include "ui/fuel_cluster.h"
 #include "units.h"
 #include "ui/gauge.h"
+#include "ui/labeled_gauge.h"
+#include "ui/throttle_display.h"
 #include "constants.h"
 #include "app/engine_sim_application.h"
 
@@ -19,7 +25,7 @@ RightGaugeCluster::RightGaugeCluster() {
     m_manifoldVacuumGauge = nullptr;
     m_volumetricEffGauge = nullptr;
     m_intakeCfmGauge = nullptr;
-    m_combusionChamberStatus = nullptr;
+    m_combustionChamberStatus = nullptr;
     m_throttleDisplay = nullptr;
     m_fuelCluster = nullptr;
     m_isAbsolute = false;
@@ -37,14 +43,14 @@ void RightGaugeCluster::initialize(EngineSimApplication *app) {
     m_manifoldVacuumGauge = addElement<LabeledGauge>();
     m_intakeCfmGauge = addElement<LabeledGauge>();
     m_volumetricEffGauge = addElement<LabeledGauge>();
-    m_combusionChamberStatus = addElement<FiringOrderDisplay>();
+    m_combustionChamberStatus = addElement<FiringOrderDisplay>();
     m_throttleDisplay = addElement<ThrottleDisplay>();
     m_afrCluster = addElement<AfrCluster>();
     m_fuelCluster = addElement<FuelCluster>();
 
     m_speedUnits = app->getAppSettings()->speedUnits;
     m_pressureUnits = app->getAppSettings()->pressureUnits;
-    m_combusionChamberStatus->m_engine = m_engine;
+    m_combustionChamberStatus->m_engine = m_engine;
 
     constexpr float shortenAngle = (float)units::angle(1.0, units::deg);
 
@@ -165,7 +171,7 @@ void RightGaugeCluster::destroy() {
 }
 
 void RightGaugeCluster::update(float dt) {
-    m_combusionChamberStatus->m_engine = m_engine;
+    m_combustionChamberStatus->m_engine = m_engine;
     m_throttleDisplay->m_engine = m_engine;
     m_afrCluster->m_engine = m_engine;
     m_fuelCluster->m_engine = m_engine;
@@ -222,7 +228,7 @@ void RightGaugeCluster::renderTachSpeedCluster(const Bounds &bounds) {
         : (float)units::convert(std::abs(getSpeed()), units::km / units::hour);
 
 
-    m_combusionChamberStatus->m_bounds = right;
+    m_combustionChamberStatus->m_bounds = right;
 }
 
 void RightGaugeCluster::renderFuelAirCluster(const Bounds &bounds) {

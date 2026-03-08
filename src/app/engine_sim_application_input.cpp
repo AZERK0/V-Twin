@@ -1,6 +1,12 @@
 #include "app/engine_sim_application.h"
 
+#include "audio/synthesizer.h"
+#include "domain/engine/engine.h"
+#include "domain/vehicle/transmission.h"
+#include "simulation/simulator.h"
 #include "shared/utilities.h"
+#include "ui/info_cluster.h"
+#include "units.h"
 
 namespace {
     double controlRate(bool fineControlMode, double normalRate, double fineRate) {

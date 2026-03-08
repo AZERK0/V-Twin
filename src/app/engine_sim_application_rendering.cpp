@@ -1,5 +1,15 @@
 #include "app/engine_sim_application.h"
 
+#include "domain/engine/engine.h"
+#include "ui/engine_view.h"
+#include "ui/info_cluster.h"
+#include "ui/load_simulation_cluster.h"
+#include "ui/mixer_cluster.h"
+#include "ui/oscilloscope_cluster.h"
+#include "ui/performance_cluster.h"
+#include "ui/right_gauge_cluster.h"
+#include "units.h"
+
 void EngineSimApplication::layoutScreen0(const Bounds &windowBounds) {
     Grid grid;
     grid.v_cells = 2;

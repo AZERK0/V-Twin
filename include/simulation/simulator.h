@@ -2,17 +2,15 @@
 #define ATG_ENGINE_SIM_SIMULATOR_H
 
 #include "domain/engine/engine.h"
-#include "domain/vehicle/transmission.h"
-#include "domain/vehicle/vehicle.h"
 #include "audio/synthesizer.h"
 #include "domain/vehicle/dynamometer.h"
 #include "domain/vehicle/starter_motor.h"
-#include "audio/derivative_filter.h"
 #include "domain/vehicle/vehicle_drag_constraint.h"
-#include "audio/delay_filter.h"
-#include "domain/engine/engine.h"
 
 #include <chrono>
+
+class Transmission;
+class Vehicle;
 
 class Simulator {
 public:

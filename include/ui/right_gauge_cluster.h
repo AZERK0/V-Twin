@@ -3,14 +3,15 @@
 
 #include "ui/ui_element.h"
 
-#include "domain/engine/engine.h"
-#include "simulation/simulator.h"
-#include "ui/gauge.h"
-#include "ui/firing_order_display.h"
-#include "ui/labeled_gauge.h"
-#include "ui/throttle_display.h"
-#include "ui/afr_cluster.h"
-#include "ui/fuel_cluster.h"
+#include <string>
+
+class AfrCluster;
+class Engine;
+class FiringOrderDisplay;
+class FuelCluster;
+class LabeledGauge;
+class Simulator;
+class ThrottleDisplay;
 
 class RightGaugeCluster : public UiElement {
     public:
@@ -49,7 +50,7 @@ class RightGaugeCluster : public UiElement {
         FuelCluster *m_fuelCluster;
         ThrottleDisplay *m_throttleDisplay;
         AfrCluster *m_afrCluster;
-        FiringOrderDisplay *m_combusionChamberStatus;
+        FiringOrderDisplay *m_combustionChamberStatus;
         std::string m_speedUnits;
         std::string m_pressureUnits;
         bool m_isAbsolute;

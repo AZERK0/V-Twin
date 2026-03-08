@@ -1,7 +1,9 @@
 #include "ui/afr_cluster.h"
 
+#include "domain/engine/engine.h"
 #include "units.h"
 #include "ui/gauge.h"
+#include "ui/labeled_gauge.h"
 #include "constants.h"
 #include "app/engine_sim_application.h"
 

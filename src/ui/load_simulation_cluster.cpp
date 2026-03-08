@@ -1,6 +1,8 @@
 #include "ui/load_simulation_cluster.h"
 
 #include "app/engine_sim_application.h"
+#include "domain/vehicle/transmission.h"
+#include "ui/info_cluster.h"
 #include "ui/ui_utilities.h"
 
 #include <climits>

@@ -1,6 +1,7 @@
 #include "ui/fuel_cluster.h"
 
 #include "app/engine_sim_application.h"
+#include "domain/vehicle/vehicle.h"
 
 #include <sstream>
 #include <iomanip>

@@ -2,32 +2,30 @@
 #define ATG_ENGINE_SIM_ENGINE_SIM_APPLICATION_H
 
 #include "rendering/geometry_generator.h"
-#include "simulation/simulator.h"
-#include "domain/engine/engine.h"
 #include "rendering/simulation_object.h"
 #include "ui/ui_manager.h"
-#include "domain/vehicle/dynamometer.h"
-#include "ui/oscilloscope.h"
 #include "audio/audio_buffer.h"
-#include "audio/convolution_filter.h"
 #include "rendering/shaders.h"
-#include "ui/engine_view.h"
-#include "ui/right_gauge_cluster.h"
-#include "ui/cylinder_temperature_gauge.h"
-#include "audio/synthesizer.h"
-#include "ui/oscilloscope_cluster.h"
-#include "ui/performance_cluster.h"
-#include "ui/load_simulation_cluster.h"
-#include "ui/mixer_cluster.h"
-#include "ui/info_cluster.h"
 #include "app/application_settings.h"
-#include "domain/vehicle/transmission.h"
 
 #include "delta.h"
 #include "dtv.h"
 
 #include <string>
 #include <vector>
+
+class CylinderTemperatureGauge;
+class Engine;
+class EngineView;
+class InfoCluster;
+class LoadSimulationCluster;
+class MixerCluster;
+class OscilloscopeCluster;
+class PerformanceCluster;
+class RightGaugeCluster;
+class Simulator;
+class Transmission;
+class Vehicle;
 
 class EngineSimApplication {
     private:
@@ -70,7 +68,7 @@ class EngineSimApplication {
 
         ysVector getBackgroundColor() const { return m_background; }
         ysVector getForegroundColor() const { return m_foreground; }
-        ysVector getHightlight1Color() const { return m_highlight1; }
+        ysVector getHighlight1Color() const { return m_highlight1; }
         ysVector getPink() const { return m_pink; }
         ysVector getGreen() const { return m_green; }
         ysVector getYellow() const { return m_yellow; }

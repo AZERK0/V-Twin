@@ -1,9 +1,10 @@
 #include "ui/engine_view.h"
 
 #include "app/engine_sim_application.h"
+#include "units.h"
 
 EngineView::EngineView() {
-    m_pan = { 0, units::distance(-6, units::inch) };
+    m_pan = Point{ 0, units::distance(-6, units::inch) };
     m_checkMouse = true;
     m_lastScroll = 0;
     m_zoom = 1.0f;

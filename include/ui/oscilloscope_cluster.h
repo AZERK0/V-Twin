@@ -2,9 +2,11 @@
 #define ATG_ENGINE_SIM_OSCILLOSCOPE_CLUSTER_H
 
 #include "ui/ui_element.h"
-
-#include "simulation/simulator.h"
 #include "ui/oscilloscope.h"
+
+#include <string>
+
+class Simulator;
 
 class OscilloscopeCluster : public UiElement {
     private:
@@ -41,7 +43,7 @@ class OscilloscopeCluster : public UiElement {
             Oscilloscope *osc,
             const Bounds &bounds,
             const std::string &title,
-            bool overlay=false);
+            bool overlay = false);
 
         Simulator *m_simulator;
         Oscilloscope

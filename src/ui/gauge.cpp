@@ -162,6 +162,6 @@ void Gauge::render() {
     m_app->getShaders()->SetBaseColor(m_app->getForegroundColor());
     m_app->drawGenerated(ticks, 0x11, m_app->getShaders()->GetUiFlags());
 
-    m_app->getShaders()->SetBaseColor(m_app->getHightlight1Color());
+    m_app->getShaders()->SetBaseColor(m_app->getHighlight1Color());
     m_app->drawGenerated(needle, 0x11, m_app->getShaders()->GetUiFlags());
 }

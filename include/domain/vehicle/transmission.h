@@ -1,9 +1,10 @@
 #ifndef ATG_ENGINE_SIM_TRANSMISSION_H
 #define ATG_ENGINE_SIM_TRANSMISSION_H
 
-#include "domain/vehicle/vehicle.h"
-#include "domain/engine/engine.h"
 #include "scs.h"
+
+class Engine;
+class Vehicle;
 
 class Transmission {
     public:

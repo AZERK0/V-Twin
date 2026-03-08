@@ -3,12 +3,8 @@
 
 #include "ui/ui_element.h"
 
-#include "domain/engine/engine.h"
-#include "ui/gauge.h"
-#include "ui/cylinder_temperature_gauge.h"
-#include "ui/cylinder_pressure_gauge.h"
-#include "ui/labeled_gauge.h"
-#include "ui/throttle_display.h"
+class Engine;
+class LabeledGauge;
 
 class AfrCluster : public UiElement {
     public:

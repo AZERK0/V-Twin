@@ -1,5 +1,7 @@
 #include "domain/vehicle/transmission.h"
 
+#include "domain/engine/engine.h"
+#include "domain/vehicle/vehicle.h"
 #include "units.h"
 
 #include <cmath>

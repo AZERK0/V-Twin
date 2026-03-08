@@ -1,5 +1,8 @@
 #include "simulation/simulator.h"
 
+#include "domain/vehicle/transmission.h"
+#include "domain/vehicle/vehicle.h"
+
 Simulator::Simulator() {
     m_engine = nullptr;
     m_vehicle = nullptr;

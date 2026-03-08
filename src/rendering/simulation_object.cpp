@@ -1,9 +1,12 @@
 #include "rendering/simulation_object.h"
 
+#include "domain/engine/connecting_rod.h"
+#include "domain/engine/engine.h"
 #include "domain/engine/piston.h"
 #include "domain/engine/cylinder_bank.h"
 
 #include "app/engine_sim_application.h"
+#include "simulation/simulator.h"
 
 SimulationObject::SimulationObject() {
     m_app = nullptr;

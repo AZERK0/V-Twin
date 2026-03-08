@@ -1,5 +1,6 @@
 #include "rendering/piston_object.h"
 
+#include "domain/engine/connecting_rod.h"
 #include "domain/engine/cylinder_bank.h"
 #include "app/engine_sim_application.h"
 
