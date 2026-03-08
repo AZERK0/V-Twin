@@ -4,6 +4,10 @@ workspace/
 # Build directory
 build/
 
+# Editor and local tooling files
+.idea/
+firebase-debug.log
+
 # clangd cache and code completion files
 .cache
 compile_commands.json

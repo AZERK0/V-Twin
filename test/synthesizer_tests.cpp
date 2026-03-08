@@ -2,46 +2,48 @@
 
 #include "../include/synthesizer.h"
 
+#include <array>
 #include <chrono>
+#include <vector>
 
 using namespace std::chrono_literals;
 
-void setupStandardSynthesizer(Synthesizer &synth) {
-    Synthesizer::Parameters params;
-    params.audioBufferSize = 512 * 16;
-    params.audioSampleRate = 16;
-    params.inputBufferSize = 256;
-    params.inputChannelCount = 8;
-    params.inputSampleRate = 32;
+namespace {
+    Synthesizer::AudioParameters createAudioParameters() {
+        Synthesizer::AudioParameters audioParams;
+        audioParams.airNoise = 0.0;
+        audioParams.inputSampleNoise = 0.0;
+        audioParams.levelerMaxGain = 1.0;
+        audioParams.levelerMinGain = 1.0;
+        audioParams.dF_F_mix = 0.0;
+        return audioParams;
+    }
 
-    Synthesizer::AudioParameters audioParams;
-    audioParams.airNoise = 0.0;
-    audioParams.inputSampleNoise = 0.0;
-    audioParams.levelerMaxGain = 1.0;
-    audioParams.levelerMinGain = 1.0;
-    audioParams.dF_F_mix = 0.0;
-    params.initialAudioParameters = audioParams;
+    void setupStandardSynthesizer(Synthesizer &synth) {
+        Synthesizer::Parameters params;
+        params.audioBufferSize = 512 * 16;
+        params.audioSampleRate = 16;
+        params.inputBufferSize = 256;
+        params.inputChannelCount = 8;
+        params.inputSampleRate = 32;
+        params.initialAudioParameters = createAudioParameters();
+        synth.initialize(params);
+    }
 
-    synth.initialize(params);
-}
+    void setupSynchronizedSynthesizer(Synthesizer &synth) {
+        Synthesizer::Parameters params;
+        params.audioBufferSize = 512 * 16;
+        params.audioSampleRate = 32;
+        params.inputBufferSize = 1024;
+        params.inputChannelCount = 8;
+        params.inputSampleRate = 32;
+        params.initialAudioParameters = createAudioParameters();
+        synth.initialize(params);
+    }
 
-void setupSynchronizedSynthesizer(Synthesizer &synth) {
-    Synthesizer::Parameters params;
-    params.audioBufferSize = 512 * 16;
-    params.audioSampleRate = 32;
-    params.inputBufferSize = 1024;
-    params.inputChannelCount = 8;
-    params.inputSampleRate = 32;
-
-    Synthesizer::AudioParameters audioParams;
-    audioParams.airNoise = 0.0;
-    audioParams.inputSampleNoise = 0.0;
-    audioParams.levelerMaxGain = 1.0;
-    audioParams.levelerMinGain = 1.0;
-    audioParams.dF_F_mix = 0.0;
-    params.initialAudioParameters = audioParams;
-
-    synth.initialize(params);
+    std::array<double, 8> makeInputSample(double value) {
+        return { value, value, value, value, value, value, value, value };
+    }
 }
 
 TEST(SynthesizerTests, SynthesizerSanityCheck) {
@@ -114,24 +116,22 @@ TEST(SynthesizerTests, SynthesizerSystemTestSingleThread) {
     Synthesizer synth;
     setupSynchronizedSynthesizer(synth);
 
-    int16_t *output = new int16_t[outputSamples];
+    std::vector<int16_t> output(outputSamples);
     int totalSamples = 0;
 
     for (int i = 0; i < inputSamples;) {
         for (int j = 0; j < 16; ++j, ++i) {
-            const double v = (double)i;
-            const double data[] = { v, v, v, v, v, v, v, v };
-            synth.writeInput(data);
+            const auto input = makeInputSample(static_cast<double>(i));
+            synth.writeInput(input.data());
         }
 
         synth.endInputBlock();
         synth.renderAudio();
 
-        totalSamples += synth.readAudioOutput(16, output + totalSamples);
-        int a = 0;
+        totalSamples += synth.readAudioOutput(16, output.data() + totalSamples);
     }
 
-    const int rem = synth.readAudioOutput(outputSamples - totalSamples, output + totalSamples);
+    const int rem = synth.readAudioOutput(outputSamples - totalSamples, output.data() + totalSamples);
 
     EXPECT_EQ(rem, outputSamples - totalSamples);
 
@@ -144,7 +144,6 @@ TEST(SynthesizerTests, SynthesizerSystemTestSingleThread) {
     }
 
     synth.destroy();
-    delete[] output;
 }
 
 TEST(SynthesizerTests, SynthesizerSystemTest) {
@@ -155,24 +154,23 @@ TEST(SynthesizerTests, SynthesizerSystemTest) {
     setupSynchronizedSynthesizer(synth);
     synth.startAudioRenderingThread();
 
-    int16_t *output = new int16_t[outputSamples];
+    std::vector<int16_t> output(outputSamples);
     int totalSamples = 0;
 
     for (int i = 0; i < inputSamples;) {
         for (int j = 0; j < 16; ++j, ++i) {
-            const double v = (double)i;
-            const double data[] = { v, v, v, v, v, v, v, v };
-            synth.writeInput(data);
+            const auto input = makeInputSample(static_cast<double>(i));
+            synth.writeInput(input.data());
         }
 
-        const int samplesReturned = synth.readAudioOutput(8, output + totalSamples);
+        const int samplesReturned = synth.readAudioOutput(8, output.data() + totalSamples);
         totalSamples += samplesReturned;
     }
 
     synth.endInputBlock();
     synth.waitProcessed();
 
-    const int rem = synth.readAudioOutput(outputSamples - totalSamples, output + totalSamples);
+    const int rem = synth.readAudioOutput(outputSamples - totalSamples, output.data() + totalSamples);
     EXPECT_EQ(rem, outputSamples - totalSamples);
 
     for (int i = 0; i < 16; ++i) {
@@ -185,6 +183,4 @@ TEST(SynthesizerTests, SynthesizerSystemTest) {
 
     synth.endAudioRenderingThread();
     synth.destroy();
-
-    delete[] output;
 }

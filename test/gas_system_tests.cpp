@@ -6,6 +6,14 @@
 
 #include <sstream>
 
+namespace {
+    GasSystem createGasSystem(double pressure, double volume, double temperature) {
+        GasSystem system;
+        system.initialize(pressure, volume, temperature);
+        return system;
+    }
+}
+
 TEST(GasSystemTests, GasSystemSanity) {
     GasSystem system;
     system.initialize(0.0, 0.0, 0.0);
@@ -48,14 +56,13 @@ TEST(GasSystemTests, AdiabaticEnergyConservation) {
 }
 
 TEST(GasSystemTests, PressureEqualizationEnergyConservation) {
-    GasSystem system1, system2;
-    system1.initialize(
+    GasSystem system1 = createGasSystem(
         units::pressure(1.0, units::atm),
         units::volume(1000.0, units::cc),
         units::celcius(25.0)
     );
 
-    system2.initialize(
+    GasSystem system2 = createGasSystem(
         units::pressure(2.0, units::atm),
         units::volume(1000.0, units::cc),
         units::celcius(25.0)
@@ -74,7 +81,6 @@ TEST(GasSystemTests, PressureEqualizationEnergyConservation) {
     params.system_0 = &system1;
     params.system_1 = &system2;
 
-    const double dt = 1 / 100.0;
     const int steps = 1000;
     for (int i = 1; i <= steps; ++i) {
         GasSystem::flow(params);
@@ -83,22 +89,18 @@ TEST(GasSystemTests, PressureEqualizationEnergyConservation) {
     const double finalSystemEnergy = system1.totalEnergy() + system2.totalEnergy();
     const double finalMolecules = system1.n() + system2.n();
 
-    const double p0 = system1.pressure();
-    const double p1 = system2.pressure();
-
     EXPECT_NEAR(finalMolecules, initialMolecules, 1E-6);
     EXPECT_NEAR(finalSystemEnergy, initialSystemEnergy, 1E-4);
 }
 
 TEST(GasSystemTests, PressureEquilibriumMaxFlow) {
-    GasSystem system1, system2;
-    system1.initialize(
+    GasSystem system1 = createGasSystem(
         units::pressure(1.0, units::atm),
         units::volume(1.0, units::cc),
         units::celcius(2500.0)
     );
 
-    system2.initialize(
+    GasSystem system2 = createGasSystem(
         units::pressure(2.0, units::atm),
         units::volume(1.0, units::cc),
         units::celcius(25.0)
@@ -122,8 +124,7 @@ TEST(GasSystemTests, PressureEquilibriumMaxFlow) {
 }
 
 TEST(GasSystemTests, PressureEquilibriumMaxFlowInfinite) {
-    GasSystem system1;
-    system1.initialize(
+    GasSystem system1 = createGasSystem(
         units::pressure(1.0, units::atm),
         units::volume(1.0, units::cc),
         units::celcius(25.0)
@@ -141,8 +142,7 @@ TEST(GasSystemTests, PressureEquilibriumMaxFlowInfinite) {
 }
 
 TEST(GasSystemTests, PressureEquilibriumMaxFlowInfiniteOverpressure) {
-    GasSystem system1;
-    system1.initialize(
+    GasSystem system1 = createGasSystem(
         units::pressure(100.0, units::atm),
         units::volume(1.0, units::m3),
         units::celcius(2500.0)
