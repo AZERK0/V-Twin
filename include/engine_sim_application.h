@@ -92,8 +92,23 @@ class EngineSimApplication {
 
     protected:
         void loadScript();
+        void loadDefaultVehicle(Vehicle **vehicle) const;
+        void loadDefaultTransmission(Transmission **transmission) const;
+        void initializeImpulseResponses(Engine *engine);
         void processEngineInput();
+        bool processFineAudioControls(float dt, int mouseWheelDelta, bool fineControlMode);
+        void updateThrottleControl(int mouseWheelDelta, bool fineControlMode);
+        void updateViewLayer();
+        void updateDynoControls(float dt, int mouseWheelDelta);
+        void updateStarterState();
+        void updateIgnitionState();
+        void updateTransmissionState();
+        void updateClutchState(float dt);
         void renderScene();
+        void layoutScreen0(const Bounds &windowBounds);
+        void layoutScreen1(const Bounds &windowBounds);
+        void layoutScreen2(const Bounds &windowBounds);
+        void updateRenderTarget(int screenHeight);
 
         void refreshUserInterface();
 

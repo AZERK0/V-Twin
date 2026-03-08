@@ -91,6 +91,9 @@ set(ENGINE_SIM_CORE_HEADERS
 set(ENGINE_SIM_APP_SOURCES
     src/main.cpp
     src/engine_sim_application.cpp
+    src/engine_sim_application_input.cpp
+    src/engine_sim_application_rendering.cpp
+    src/engine_sim_application_simulation.cpp
     src/geometry_generator.cpp
     src/simulation_object.cpp
     src/piston_object.cpp

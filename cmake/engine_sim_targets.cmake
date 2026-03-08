@@ -24,6 +24,7 @@ if (PIRANHA_ENABLED)
     )
 
     target_link_libraries(engine-sim-script-interpreter
+        engine-sim
         csv-io
         piranha
     )
