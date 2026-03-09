@@ -268,12 +268,14 @@ void OscilloscopeCluster::update(float dt) {
 }
 
 void OscilloscopeCluster::render() {
+    if (m_engineWearModeEnabled) {
+        m_engineWearCluster->renderDashboard(m_bounds);
+        return;
+    }
+
     Grid grid;
     grid.h_cells = 3;
     grid.v_cells = 4;
-
-    m_engineWearCluster->setVisible(m_engineWearModeEnabled);
-    m_totalExhaustFlowScope->setVisible(!m_engineWearModeEnabled);
 
     const Bounds &hpTorqueBounds = grid.get(m_bounds, 0, 3);
     renderScope(m_torqueScope, hpTorqueBounds, "Torque/Power");
@@ -295,12 +297,7 @@ void OscilloscopeCluster::render() {
     renderScope(m_pvScope, cylinderPressureBounds, "pressure-volume");
 
     const Bounds &totalExhaustPressureBounds = grid.get(m_bounds, 1, 2);
-    if (m_engineWearModeEnabled) {
-        m_engineWearCluster->m_bounds = totalExhaustPressureBounds;
-    }
-    else {
-        renderScope(m_totalExhaustFlowScope, totalExhaustPressureBounds, "Total Exhaust Flow");
-    }
+    renderScope(m_totalExhaustFlowScope, totalExhaustPressureBounds, "Total Exhaust Flow");
 
     const Bounds &focusBounds = grid.get(m_bounds, 0, 0, 3, 2);
     Bounds focusTitle = focusBounds;
@@ -311,18 +308,11 @@ void OscilloscopeCluster::render() {
     drawFrame(focusTitle, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
     drawFrame(focusBody, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
-    if (m_engineWearModeEnabled) {
-        drawText("Engine Wear Mode", focusTitle.inset(20.0f), 24.0f, Bounds::tl);
-        drawAlignedText("[J] toggle", focusTitle.inset(20.0f), 18.0f, Bounds::tr, Bounds::tr);
-        m_engineWearCluster->renderDashboard(focusBody);
-    }
-    else {
-        for (int i = 0; i < MaxLayeredScopes; ++i) {
-            if (m_currentFocusScopes[i] != nullptr) {
-                m_currentFocusScopes[i]->render(focusBody);
-            }
-            else break;
+    for (int i = 0; i < MaxLayeredScopes; ++i) {
+        if (m_currentFocusScopes[i] != nullptr) {
+            m_currentFocusScopes[i]->render(focusBody);
         }
+        else break;
     }
 
     UiElement::render();
