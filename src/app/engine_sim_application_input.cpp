@@ -6,6 +6,7 @@
 #include "simulation/simulator.h"
 #include "shared/utilities.h"
 #include "ui/info_cluster.h"
+#include "ui/oscilloscope_cluster.h"
 #include "units.h"
 
 namespace {
@@ -237,6 +238,15 @@ void EngineSimApplication::processEngineInput() {
 
     processFineAudioControls(dt, mouseWheelDelta, fineControlMode);
     updateThrottleControl(mouseWheelDelta, fineControlMode);
+
+    if (m_engine.ProcessKeyDown(ysKey::Code::J)) {
+        m_oscCluster->toggleEngineWearMode();
+        m_infoCluster->setLogMessage(
+            m_oscCluster->isEngineWearModeEnabled()
+                ? "[J] - Engine wear HUD enabled"
+                : "[J] - Engine wear HUD disabled");
+    }
+
     updateViewLayer();
     updateDynoControls(dt, mouseWheelDelta);
     updateStarterState();

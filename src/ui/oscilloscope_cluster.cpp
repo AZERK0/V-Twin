@@ -3,6 +3,7 @@
 #include "app/engine_sim_application.h"
 #include "domain/engine/engine.h"
 #include "simulation/simulator.h"
+#include "ui/engine_wear_cluster.h"
 #include "ui/oscilloscope.h"
 
 #include <sstream>
@@ -11,6 +12,7 @@ OscilloscopeCluster::OscilloscopeCluster() {
     m_simulator = nullptr;
     m_torqueScope = nullptr;
     m_powerScope = nullptr;
+    m_engineWearCluster = nullptr;
     m_totalExhaustFlowScope = nullptr;
     m_intakeFlowScope = nullptr;
     m_exhaustFlowScope = nullptr;
@@ -31,6 +33,7 @@ OscilloscopeCluster::OscilloscopeCluster() {
 
     m_updatePeriod = 0.25f;
     m_updateTimer = 0.0f;
+    m_engineWearModeEnabled = true;
 }
 
 OscilloscopeCluster::~OscilloscopeCluster() {
@@ -42,6 +45,7 @@ void OscilloscopeCluster::initialize(EngineSimApplication *app) {
 
     m_torqueScope = addElement<Oscilloscope>(this);
     m_powerScope = addElement<Oscilloscope>(this);
+    m_engineWearCluster = addElement<EngineWearCluster>();
     m_exhaustFlowScope = addElement<Oscilloscope>(this);
     m_totalExhaustFlowScope = addElement<Oscilloscope>(this);
     m_intakeFlowScope = addElement<Oscilloscope>(this);
@@ -268,6 +272,9 @@ void OscilloscopeCluster::render() {
     grid.h_cells = 3;
     grid.v_cells = 4;
 
+    m_engineWearCluster->setVisible(m_engineWearModeEnabled);
+    m_totalExhaustFlowScope->setVisible(!m_engineWearModeEnabled);
+
     const Bounds &hpTorqueBounds = grid.get(m_bounds, 0, 3);
     renderScope(m_torqueScope, hpTorqueBounds, "Torque/Power");
     renderScope(m_powerScope, hpTorqueBounds, "", true);
@@ -288,7 +295,12 @@ void OscilloscopeCluster::render() {
     renderScope(m_pvScope, cylinderPressureBounds, "pressure-volume");
 
     const Bounds &totalExhaustPressureBounds = grid.get(m_bounds, 1, 2);
-    renderScope(m_totalExhaustFlowScope, totalExhaustPressureBounds, "Total Exhaust Flow");
+    if (m_engineWearModeEnabled) {
+        m_engineWearCluster->m_bounds = totalExhaustPressureBounds;
+    }
+    else {
+        renderScope(m_totalExhaustFlowScope, totalExhaustPressureBounds, "Total Exhaust Flow");
+    }
 
     const Bounds &focusBounds = grid.get(m_bounds, 0, 0, 3, 2);
     Bounds focusTitle = focusBounds;
@@ -299,11 +311,18 @@ void OscilloscopeCluster::render() {
     drawFrame(focusTitle, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
     drawFrame(focusBody, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
-    for (int i = 0; i < MaxLayeredScopes; ++i) {
-        if (m_currentFocusScopes[i] != nullptr) {
-            m_currentFocusScopes[i]->render(focusBody);
+    if (m_engineWearModeEnabled) {
+        drawText("Engine Wear Mode", focusTitle.inset(20.0f), 24.0f, Bounds::tl);
+        drawAlignedText("[J] toggle", focusTitle.inset(20.0f), 18.0f, Bounds::tr, Bounds::tr);
+        m_engineWearCluster->renderDashboard(focusBody);
+    }
+    else {
+        for (int i = 0; i < MaxLayeredScopes; ++i) {
+            if (m_currentFocusScopes[i] != nullptr) {
+                m_currentFocusScopes[i]->render(focusBody);
+            }
+            else break;
         }
-        else break;
     }
 
     UiElement::render();
@@ -366,6 +385,7 @@ void OscilloscopeCluster::sample() {
 
 void OscilloscopeCluster::setSimulator(Simulator *simulator) {
     m_simulator = simulator;
+    m_engineWearCluster->setSimulator(simulator);
 }
 
 void OscilloscopeCluster::renderScope(
