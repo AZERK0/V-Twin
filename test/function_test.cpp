@@ -1,8 +1,22 @@
 #include <gtest/gtest.h>
 
-#include "../include/function.h"
+#include "shared/function.h"
 
 #include <stdlib.h>
+
+namespace {
+    Function createGaussianTestFunction() {
+        Function function;
+        function.initialize(0, 1.0);
+        function.addSample(0.0, 1.0);
+        function.addSample(2.0, 1.0);
+        function.addSample(3.0, 5.0);
+        function.addSample(1.0, 1.0);
+        function.addSample(5.0, 10.0);
+        function.addSample(4.0, 9.0);
+        return function;
+    }
+}
 
 TEST(FunctionTests, FunctionSanityCheck) {
     Function f;
@@ -57,24 +71,12 @@ TEST(FunctionTests, FunctionRandomAddTest) {
 }
 
 TEST(FunctionTests, FunctionGaussianTest) {
-    Function f;
-    f.initialize(0, 1.0);
-    f.addSample(0.0, 1.0);
-    f.addSample(2.0, 1.0);
-    f.addSample(3.0, 5.0);
-    f.addSample(1.0, 1.0);
-    f.addSample(5.0, 10.0);
-    f.addSample(4.0, 9.0);
+    Function f = createGaussianTestFunction();
 
     EXPECT_NEAR(f.sampleGaussian(2.0), 1.0, 0.1);
     EXPECT_NEAR(f.sampleGaussian(4.0), 9.0, 0.3);
     EXPECT_NEAR(f.sampleGaussian(100.0), 10.0, 1E-3);
     EXPECT_NEAR(f.sampleGaussian(-100.0), 1.0, 1E-3);
-
-    for (double s = 2.0; s <= 3.0; s += 0.001) {
-        const double v = f.sampleGaussian(s);
-        std::cerr << v << "\n";
-    }
 
     f.destroy();
 }

@@ -1,0 +1,208 @@
+set(ENGINE_SIM_CORE_SOURCES
+    src/audio/audio_buffer.cpp
+    src/domain/engine/camshaft.cpp
+    src/domain/engine/crankshaft.cpp
+    src/domain/engine/combustion_chamber.cpp
+    src/domain/engine/connecting_rod.cpp
+    src/audio/convolution_filter.cpp
+    src/domain/engine/cylinder_bank.cpp
+    src/domain/engine/cylinder_head.cpp
+    src/audio/delay_filter.cpp
+    src/audio/derivative_filter.cpp
+    src/domain/engine/direct_throttle_linkage.cpp
+    src/domain/vehicle/dynamometer.cpp
+    src/domain/engine/engine.cpp
+    src/domain/engine/exhaust_system.cpp
+    src/audio/feedback_comb_filter.cpp
+    src/audio/filter.cpp
+    src/domain/engine/fuel.cpp
+    src/shared/function.cpp
+    src/domain/engine/gas_system.cpp
+    src/audio/gaussian_filter.cpp
+    src/domain/engine/governor.cpp
+    src/domain/engine/ignition_module.cpp
+    src/audio/impulse_response.cpp
+    src/domain/engine/intake.cpp
+    src/audio/jitter_filter.cpp
+    src/audio/leveling_filter.cpp
+    src/audio/low_pass_filter.cpp
+    src/domain/engine/part.cpp
+    src/domain/engine/piston.cpp
+    src/simulation/piston_engine_simulator.cpp
+    src/simulation/simulator.cpp
+    src/domain/engine/standard_valvetrain.cpp
+    src/domain/vehicle/starter_motor.cpp
+    src/audio/synthesizer.cpp
+    src/domain/engine/throttle.cpp
+    src/domain/vehicle/transmission.cpp
+    src/shared/utilities.cpp
+    src/domain/engine/valvetrain.cpp
+    src/domain/vehicle/vehicle.cpp
+    src/domain/vehicle/vehicle_drag_constraint.cpp
+    src/domain/engine/vtec_valvetrain.cpp
+)
+
+set(ENGINE_SIM_CORE_HEADERS
+    include/audio/audio_buffer.h
+    include/app/application_settings.h
+    include/domain/engine/camshaft.h
+    include/domain/engine/crankshaft.h
+    include/domain/engine/combustion_chamber.h
+    include/domain/engine/connecting_rod.h
+    include/audio/convolution_filter.h
+    include/domain/engine/cylinder_bank.h
+    include/domain/engine/cylinder_head.h
+    include/audio/delay_filter.h
+    include/audio/derivative_filter.h
+    include/domain/engine/direct_throttle_linkage.h
+    include/domain/vehicle/dynamometer.h
+    include/domain/engine/engine.h
+    include/domain/engine/exhaust_system.h
+    include/audio/feedback_comb_filter.h
+    include/audio/filter.h
+    include/domain/engine/fuel.h
+    include/shared/function.h
+    include/domain/engine/gas_system.h
+    include/audio/gaussian_filter.h
+    include/domain/engine/governor.h
+    include/domain/engine/ignition_module.h
+    include/audio/impulse_response.h
+    include/domain/engine/intake.h
+    include/audio/jitter_filter.h
+    include/audio/leveling_filter.h
+    include/audio/low_pass_filter.h
+    include/domain/engine/part.h
+    include/domain/engine/piston.h
+    include/simulation/piston_engine_simulator.h
+    include/simulation/simulator.h
+    include/domain/engine/standard_valvetrain.h
+    include/domain/vehicle/starter_motor.h
+    include/audio/synthesizer.h
+    include/domain/engine/throttle.h
+    include/domain/vehicle/transmission.h
+    include/units.h
+    include/shared/utilities.h
+    include/domain/engine/valvetrain.h
+    include/domain/vehicle/vehicle.h
+    include/domain/vehicle/vehicle_drag_constraint.h
+    include/domain/engine/vtec_valvetrain.h
+)
+
+set(ENGINE_SIM_APP_SOURCES
+    src/app/main.cpp
+    src/app/engine_sim_application.cpp
+    src/app/engine_sim_application_input.cpp
+    src/app/engine_sim_application_rendering.cpp
+    src/app/engine_sim_application_simulation.cpp
+    src/rendering/geometry_generator.cpp
+    src/rendering/simulation_object.cpp
+    src/rendering/piston_object.cpp
+    src/rendering/connecting_rod_object.cpp
+    src/ui/ui_element.cpp
+    src/ui/ui_manager.cpp
+    src/ui/cylinder_pressure_gauge.cpp
+    src/ui/ui_math.cpp
+    src/ui/gauge.cpp
+    src/rendering/crankshaft_object.cpp
+    src/rendering/cylinder_bank_object.cpp
+    src/rendering/cylinder_head_object.cpp
+    src/ui/ui_button.cpp
+    src/ui/ui_utilities.cpp
+    src/rendering/combustion_chamber_object.cpp
+    src/ui/oscilloscope.cpp
+    src/rendering/shaders.cpp
+    src/ui/engine_view.cpp
+    src/ui/right_gauge_cluster.cpp
+    src/ui/cylinder_temperature_gauge.cpp
+    src/ui/labeled_gauge.cpp
+    src/ui/throttle_display.cpp
+    src/ui/afr_cluster.cpp
+    src/ui/fuel_cluster.cpp
+    src/ui/oscilloscope_cluster.cpp
+    src/ui/performance_cluster.cpp
+    src/ui/firing_order_display.cpp
+    src/ui/load_simulation_cluster.cpp
+    src/ui/mixer_cluster.cpp
+    src/ui/info_cluster.cpp
+)
+
+set(ENGINE_SIM_APP_HEADERS
+    include/delta.h
+    include/dtv.h
+    include/app/engine_sim_application.h
+    include/rendering/geometry_generator.h
+    include/rendering/simulation_object.h
+    include/rendering/piston_object.h
+    include/rendering/connecting_rod_object.h
+    include/ui/ui_element.h
+    include/ui/ui_manager.h
+    include/ui/cylinder_pressure_gauge.h
+    include/ui/ui_math.h
+    include/units.h
+    include/rendering/crankshaft_object.h
+    include/rendering/cylinder_bank_object.h
+    include/rendering/cylinder_head_object.h
+    include/ui/ui_button.h
+    include/ui/ui_utilities.h
+    include/rendering/combustion_chamber_object.h
+    include/ui/oscilloscope.h
+    include/rendering/shaders.h
+    include/ui/engine_view.h
+    include/ui/right_gauge_cluster.h
+    include/ui/cylinder_temperature_gauge.h
+    include/ui/labeled_gauge.h
+    include/ui/throttle_display.h
+    include/ui/afr_cluster.h
+    include/ui/fuel_cluster.h
+    include/ui/oscilloscope_cluster.h
+    include/ui/performance_cluster.h
+    include/ui/firing_order_display.h
+    include/ui/load_simulation_cluster.h
+    include/ui/mixer_cluster.h
+    include/ui/info_cluster.h
+)
+
+set(ENGINE_SIM_SCRIPT_SOURCES
+    scripting/src/channel_types.cpp
+    scripting/src/compiler.cpp
+    scripting/src/engine_context.cpp
+    scripting/src/language_rules.cpp
+)
+
+set(ENGINE_SIM_SCRIPT_HEADERS
+    scripting/include/actions.h
+    scripting/include/camshaft_node.h
+    scripting/include/channel_types.h
+    scripting/include/compiler.h
+    scripting/include/connecting_rod_node.h
+    scripting/include/crankshaft_node.h
+    scripting/include/cylinder_bank_node.h
+    scripting/include/cylinder_head_node.h
+    scripting/include/engine_context.h
+    scripting/include/engine_node.h
+    scripting/include/engine_sim.h
+    scripting/include/exhaust_system_node.h
+    scripting/include/intake_node.h
+    scripting/include/function_node.h
+    scripting/include/ignition_module_node.h
+    scripting/include/ignition_wire_node.h
+    scripting/include/impulse_response_node.h
+    scripting/include/language_rules.h
+    scripting/include/node.h
+    scripting/include/object_reference_node.h
+    scripting/include/object_reference_node_output.h
+    scripting/include/piranha.h
+    scripting/include/piston_node.h
+    scripting/include/rod_journal_node.h
+    scripting/include/standard_valvetrain_node.h
+    scripting/include/transmission_node.h
+    scripting/include/valvetrain_node.h
+    scripting/include/vtec_valvetrain_node.h
+    scripting/include/vehicle_node.h
+)
+
+set(ENGINE_SIM_TEST_SOURCES
+    test/gas_system_tests.cpp
+    test/function_test.cpp
+    test/synthesizer_tests.cpp
+)

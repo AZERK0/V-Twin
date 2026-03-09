@@ -1,0 +1,27 @@
+#ifndef ATG_ENGINE_SIM_AFR_CLUSTER_H
+#define ATG_ENGINE_SIM_AFR_CLUSTER_H
+
+#include "ui/ui_element.h"
+
+class Engine;
+class LabeledGauge;
+
+class AfrCluster : public UiElement {
+    public:
+        AfrCluster();
+        virtual ~AfrCluster();
+
+        virtual void initialize(EngineSimApplication *app);
+        virtual void destroy();
+
+        virtual void update(float dt);
+        virtual void render();
+
+        Engine *m_engine;
+
+    protected:
+        LabeledGauge *m_intakeAfrGauge;
+        LabeledGauge *m_exhaustAfrGauge;
+};
+
+#endif /* ATG_ENGINE_SIM_AFR_CLUSTER_H */

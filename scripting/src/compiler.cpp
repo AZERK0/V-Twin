@@ -1,4 +1,4 @@
-#include "../include/compiler.h"
+#include "compiler.h"
 
 es_script::Compiler::Output *es_script::Compiler::s_output = nullptr;
 
