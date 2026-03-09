@@ -112,6 +112,7 @@ set(ENGINE_SIM_APP_SOURCES
     src/ui/oscilloscope.cpp
     src/rendering/shaders.cpp
     src/ui/engine_view.cpp
+    src/ui/engine_wear_cluster.cpp
     src/ui/right_gauge_cluster.cpp
     src/ui/cylinder_temperature_gauge.cpp
     src/ui/labeled_gauge.cpp
@@ -148,6 +149,7 @@ set(ENGINE_SIM_APP_HEADERS
     include/ui/oscilloscope.h
     include/rendering/shaders.h
     include/ui/engine_view.h
+    include/ui/engine_wear_cluster.h
     include/ui/right_gauge_cluster.h
     include/ui/cylinder_temperature_gauge.h
     include/ui/labeled_gauge.h
