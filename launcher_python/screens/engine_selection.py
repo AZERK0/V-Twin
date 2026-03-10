@@ -38,8 +38,7 @@ class EngineSelectionScreen:
         self.logo_image = self._load_and_fit_image("logo_v_twin.png", max_width=170, max_height=100)
         self.engine_art_image = self._load_and_fit_image("image_moteur_dessein.png", max_width=220, max_height=120)
 
-        self.root.geometry("980x620")
-        self.root.minsize(860, 540)
+        self._ensure_large_window()
         self.root.configure(bg=self.APP_BG)
 
         self.frame = tk.Frame(root, bg=self.APP_BG)
@@ -184,6 +183,24 @@ class EngineSelectionScreen:
             image = image.subsample(sample, sample)
 
         return image
+
+    def _ensure_large_window(self):
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+
+        target_w = min(screen_w - 80, max(1200, int(screen_w * 0.9)))
+        target_h = min(screen_h - 120, max(760, int(screen_h * 0.88)))
+
+        self.root.geometry(f"{target_w}x{target_h}+40+30")
+        self.root.minsize(min(1100, target_w), min(700, target_h))
+
+        try:
+            self.root.state("zoomed")
+        except tk.TclError:
+            try:
+                self.root.attributes("-zoomed", True)
+            except tk.TclError:
+                pass
 
     def _format_engine_label(self):
         engine = Path(self.engine_path)
