@@ -22,6 +22,13 @@ class Shaders : public dbasic::ShaderBase {
 
         void SetBaseColor(const ysVector &color);
         void ResetBaseColor();
+        void SetScale(float x, float y, float z = 1.0f);
+        void SetColorReplace(bool colorReplace);
+        void SetLit(bool lit);
+        void SetTexOffset(float u, float v);
+        void SetTexScale(float u, float v);
+        void ResetObjectState();
+        void SetUiDiffuseTexture(ysTexture *texture);
 
         dbasic::StageEnableFlags GetRegularFlags() const;
         dbasic::StageEnableFlags GetUiFlags() const;
@@ -47,6 +54,8 @@ class Shaders : public dbasic::ShaderBase {
     protected:
         dbasic::ShaderStage *m_mainStage;
         dbasic::ShaderStage *m_uiStage;
+
+        dbasic::TextureHandle m_uiStageDiffuseTexture;
 
         dbasic::LightingControls m_lightingControls;
 };

@@ -7,6 +7,7 @@
 
 InfoCluster::InfoCluster() {
     m_engine = nullptr;
+    m_logoTexture = nullptr;
     m_logMessage = "Started";
 }
 
@@ -16,6 +17,9 @@ InfoCluster::~InfoCluster() {
 
 void InfoCluster::initialize(EngineSimApplication *app) {
     UiElement::initialize(app);
+
+    dbasic::TextureAsset *logoAsset = m_app->getAssetManager()->GetTexture("UiLogo");
+    m_logoTexture = (logoAsset != nullptr) ? logoAsset->GetTexture() : nullptr;
 }
 
 void InfoCluster::destroy() {
@@ -34,11 +38,15 @@ void InfoCluster::render() {
     const Bounds logoBounds = grid.get(m_bounds, 0, 0, 1, 2);
     drawFrame(logoBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
-    drawModel(
-        m_app->getAssetManager()->GetModelAsset("Logo"),
-        m_app->getForegroundColor(),
-        logoBounds.getPosition(Bounds::center),
-        Point(logoBounds.height(), logoBounds.height()) * 0.75f);
+    if (m_logoTexture != nullptr) {
+        const float logoSize = logoBounds.height() * 0.75f;
+        const Bounds logoImageBounds(
+            logoSize,
+            logoSize,
+            logoBounds.getPosition(Bounds::center),
+            Bounds::center);
+        drawImage(m_logoTexture, logoImageBounds, ysMath::LoadVector(1.0f, 1.0f, 1.0f, 1.0f));
+    }
 
     const Bounds titleBounds = grid.get(m_bounds, 1, 0, 5, 2);
     drawFrame(titleBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
@@ -47,13 +55,13 @@ void InfoCluster::render() {
     titleSplit.h_cells = 1;
     titleSplit.v_cells = 3;
     drawAlignedText(
-        "ENGINE SIMULATOR",
+        "V-TWIN",
         titleSplit.get(titleBounds, 0, 0).inset(10.0f).move({ 0.0f, -21.0f }),
         42.0f,
         Bounds::bl,
         Bounds::bl);
     drawAlignedText(
-        "YOUTUBE/ANGETHEGREAT",
+        "Epitech EIP",
         titleSplit.get(titleBounds, 0, 1).inset(10.0f).move({ 0.0f, 5.0f }),
         24.0f,
         Bounds::tl,

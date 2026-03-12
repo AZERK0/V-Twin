@@ -24,6 +24,7 @@ public:
 
 protected:
     Engine *m_engine;
+    ysTexture *m_logoTexture;
 
     std::string m_logMessage;
 };
