@@ -96,6 +96,10 @@ class UiElement {
         void drawBox(
                 const Bounds &bounds,
                 const ysVector &fillColor);
+        void drawImage(
+            ysTexture *texture,
+            const Bounds &bounds,
+            const ysVector &tint);
         void drawText(
                 const std::string &s,
                 const Bounds &bounds,
