@@ -18,3 +18,5 @@ compile_commands.json
 # Python bytecode cache
 __pycache__/
 *.py[cod]
+
+launcher.log

@@ -115,16 +115,18 @@ class LauncherApp(tk.Tk):
         self._displayed_engines: List[Path] = []  # Flat list of engines currently shown (for selection index)
         self._card_widgets: dict = {}  # index -> [frame, label] for selection/hover highlight
 
-        # Window: compact, floating/dialog style
-        self.geometry("520x520")
-        self.minsize(420, 420)
+        # Window: start large and centered (instead of compact fixed size)
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        target_w = min(max(1100, int(screen_w * 0.90)), max(700, screen_w - 40))
+        target_h = min(max(760, int(screen_h * 0.88)), max(520, screen_h - 80))
+        pos_x = max(0, (screen_w - target_w) // 2)
+        pos_y = max(0, (screen_h - target_h) // 2)
+
+        self.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
+        self.minsize(min(1000, target_w), min(680, target_h))
         self.resizable(True, True)
         self.configure(bg="#0f172a")
-
-        try:
-            self.attributes("-type", "dialog")  # Dialog-style window on X11
-        except tk.TclError:
-            pass
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)   # Engine list gets extra vertical space

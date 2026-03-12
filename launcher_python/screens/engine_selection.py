@@ -8,8 +8,8 @@ from screens.mode_selection import ModeSelectionScreen
 
 
 class EngineSelectionScreen:
-    APP_BG = "#16181d"
-    SURFACE_BG = "#1f2026"
+    APP_BG = "#252323"
+    SURFACE_BG = "#252323"
     BUTTON_SPRITE_FILE = "engine_button_states.png"
     BUTTON_IMAGE_FILES = {
         "normal": "engine_button_normal.png",
@@ -17,9 +17,9 @@ class EngineSelectionScreen:
         "pressed": "engine_button_pressed.png",
     }
     CARD_STYLE = {
-        "normal": {"fill": "#1a161b", "outline": "#1a161b", "width": 1},
-        "hover": {"fill": "#221218", "outline": "#2a171f", "width": 1},
-        "pressed": {"fill": "#1a0f14", "outline": "#dde2ea", "width": 2},
+        "normal": {"fill": "#1a161b", "outline": "#dde2ea", "width": 3},
+        "hover": {"fill": "#221218", "outline": "#dde2ea", "width": 10},
+        "pressed": {"fill": "#1a0f14", "outline": "#dde2ea", "width": 18},
     }
 
     def __init__(self, root):
@@ -33,10 +33,10 @@ class EngineSelectionScreen:
             self.card_width = self.card_images["normal"].width()
             self.card_height = self.card_images["normal"].height()
         else:
-            self.card_width = 380
-            self.card_height = 240
-        self.logo_image = self._load_and_fit_image("logo_v_twin.png", max_width=170, max_height=100)
-        self.engine_art_image = self._load_and_fit_image("image_moteur_dessein.png", max_width=220, max_height=120)
+            self.card_width = 780
+            self.card_height = 640
+        self.logo_image = self._load_and_fit_image("logo_v_twin.png", max_width=870, max_height=750)
+        self.engine_art_image = self._load_and_fit_image("image_moteur_dessein.png", max_width=420, max_height=320)
 
         self._ensure_large_window()
         self.root.configure(bg=self.APP_BG)
@@ -60,16 +60,7 @@ class EngineSelectionScreen:
                 font=("Segoe UI Black", 48),
                 fg="#4d5966",
             )
-        self.logo_mark.grid(row=1, column=0, pady=(4, 0))
-
-        self.title_label = tk.Label(
-            self.surface,
-            text="V-Twin",
-            font=("Segoe UI", 20, "bold"),
-            fg="#586372",
-            bg=self.SURFACE_BG,
-        )
-        self.title_label.grid(row=2, column=0, pady=(0, 14))
+        self.logo_mark.grid(row=1, column=0, pady=(4, 200))
 
         self.card_canvas = tk.Canvas(
             self.surface,
@@ -93,7 +84,7 @@ class EngineSelectionScreen:
             fg="#a8b2bf",
             bg=self.SURFACE_BG,
         )
-        self.path_label.grid(row=4, column=0, pady=(0, 14))
+        self.path_label.grid(row=4, column=0, pady=(0, 84))
 
         self.next_button = tk.Button(
             self.surface,
@@ -105,6 +96,8 @@ class EngineSelectionScreen:
             activeforeground="#ffffff",
             relief="flat",
             bd=0,
+            height=2,
+            width=10,
             padx=26,
             pady=8,
             cursor="hand2",
@@ -229,7 +222,7 @@ class EngineSelectionScreen:
             y1,
             x2,
             y2,
-            radius=24,
+            radius=200,
             fill=style["fill"],
             outline=style["outline"],
             width=style["width"],
@@ -239,13 +232,13 @@ class EngineSelectionScreen:
         center_x = self.card_width // 2
         self.card_canvas.create_text(
             center_x,
-            y1 + 28,
+            y1 + 178,
             text="Choose your Engine",
             fill="#f4f6f8",
             font=("Segoe UI", 14, "bold"),
         )
         if self.engine_art_image:
-            self.card_canvas.create_image(center_x, y1 + 130, image=self.engine_art_image)
+            self.card_canvas.create_image(center_x, y1 + 430, image=self.engine_art_image)
         else:
             self._draw_engine_icon(center_x, y1 + 58)
 
