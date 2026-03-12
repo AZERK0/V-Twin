@@ -1,5 +1,5 @@
-DEFAULT_ENGINE = "chevrolet"
+DEFAULT_ENGINE = "atg-video-2"
 
-ENGINE_PATH = f"assets/engines/{DEFAULT_ENGINE}"
+ENGINE_PATH = "assets/engines/atg-video-2/02_subaru_ej25_uh.mr"
 
 ENGINE_SIM_EXEC = "./build/linux-release/engine-sim-app"

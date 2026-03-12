@@ -1,9 +1,9 @@
 import tkinter as tk
-from tkinter import filedialog
 from pathlib import Path
 import math
 
 import config
+from screens.engine_folder_selection import EngineFolderSelectionDialog
 from screens.mode_selection import ModeSelectionScreen
 
 
@@ -310,20 +310,16 @@ class EngineSelectionScreen:
             self.choose_engine()
 
     def choose_engine(self):
-        start_dir = self.engine_path
-        candidate = Path(self.engine_path)
-        if candidate.exists():
-            start_dir = str(candidate if candidate.is_dir() else candidate.parent)
-
-        file_path = filedialog.askopenfilename(
-            initialdir=start_dir,
-            title="Select Engine File",
-            filetypes=[("Engine script", "*.mr"), ("All files", "*.*")],
-        )
-
-        if file_path:
-            self.engine_path = file_path
+        def on_confirm(engine_rel_path: str):
+            self.engine_path = engine_rel_path
             self.path_label.config(text=self._format_engine_label())
+
+        dialog = EngineFolderSelectionDialog(
+            parent=self.root,
+            current_engine_path=self.engine_path,
+            on_confirm=on_confirm,
+        )
+        self.root.wait_window(dialog)
 
     def go_to_mode_selection(self):
         self.frame.destroy()
