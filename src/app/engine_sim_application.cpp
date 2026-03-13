@@ -195,6 +195,11 @@ void EngineSimApplication::initialize(void *instance, ysContextObject::DeviceAPI
 
     m_assetManager.SetEngine(&m_engine);
 
+    const dbasic::Path logoPath = m_dataRoot.Append("design/V_twin.png");
+    if (logoPath.Exists()) {
+        m_assetManager.LoadTexture(logoPath.ToString().c_str(), "UiLogo");
+    }
+
     m_engine.GetDevice()->CreateIndexBuffer(
         &m_geometryIndexBuffer, sizeof(unsigned short) * 200000, nullptr);
     m_engine.GetDevice()->CreateVertexBuffer(

@@ -5,10 +5,19 @@ Shaders::Shaders() {
 
     m_mainStage = nullptr;
     m_uiStage = nullptr;
+    m_uiStageDiffuseTexture = 0;
 
     m_objectVariables.ColorReplace = 1;
     m_objectVariables.Lit = 0;
     m_objectVariables.Transform = ysMath::LoadIdentity();
+    m_objectVariables.Scale[0] = 1.0f;
+    m_objectVariables.Scale[1] = 1.0f;
+    m_objectVariables.Scale[2] = 1.0f;
+    m_objectVariables.Scale[3] = 1.0f;
+    m_objectVariables.TexOffset[0] = 0.0f;
+    m_objectVariables.TexOffset[1] = 0.0f;
+    m_objectVariables.TexScale[0] = 1.0f;
+    m_objectVariables.TexScale[1] = 1.0f;
 
     m_screenVariables.FogNear = m_uiScreenVariables.FogNear = 16000.0f;
     m_screenVariables.FogFar = m_uiScreenVariables.FogFar = 16001.0f;
@@ -76,6 +85,8 @@ ysError Shaders::Initialize(
         dbasic::ShaderStage::ConstantBufferBinding::BufferType::SceneData,
         &m_lightingControls);
 
+    m_uiStage->AddTextureInput(0, &m_uiStageDiffuseTexture);
+
     return YDS_ERROR_RETURN(ysError::None);
 }
 
@@ -98,6 +109,48 @@ void Shaders::SetBaseColor(const ysVector &color) {
 
 void Shaders::ResetBaseColor() {
     m_objectVariables.BaseColor = ysMath::LoadVector(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+void Shaders::SetScale(float x, float y, float z) {
+    m_objectVariables.Scale[0] = x;
+    m_objectVariables.Scale[1] = y;
+    m_objectVariables.Scale[2] = z;
+    m_objectVariables.Scale[3] = 1.0f;
+}
+
+void Shaders::SetColorReplace(bool colorReplace) {
+    m_objectVariables.ColorReplace = colorReplace ? 1 : 0;
+}
+
+void Shaders::SetLit(bool lit) {
+    m_objectVariables.Lit = lit ? 1 : 0;
+}
+
+void Shaders::SetTexOffset(float u, float v) {
+    m_objectVariables.TexOffset[0] = u;
+    m_objectVariables.TexOffset[1] = v;
+}
+
+void Shaders::SetTexScale(float u, float v) {
+    m_objectVariables.TexScale[0] = u;
+    m_objectVariables.TexScale[1] = v;
+}
+
+void Shaders::ResetObjectState() {
+    m_objectVariables.ColorReplace = 1;
+    m_objectVariables.Lit = 0;
+    m_objectVariables.Scale[0] = 1.0f;
+    m_objectVariables.Scale[1] = 1.0f;
+    m_objectVariables.Scale[2] = 1.0f;
+    m_objectVariables.Scale[3] = 1.0f;
+    m_objectVariables.TexOffset[0] = 0.0f;
+    m_objectVariables.TexOffset[1] = 0.0f;
+    m_objectVariables.TexScale[0] = 1.0f;
+    m_objectVariables.TexScale[1] = 1.0f;
+}
+
+void Shaders::SetUiDiffuseTexture(ysTexture *texture) {
+    m_uiStage->BindTexture(texture, m_uiStageDiffuseTexture);
 }
 
 dbasic::StageEnableFlags Shaders::GetRegularFlags() const {

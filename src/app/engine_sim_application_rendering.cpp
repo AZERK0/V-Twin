@@ -104,6 +104,7 @@ void EngineSimApplication::updateRenderTarget(int screenHeight) {
 }
 
 void EngineSimApplication::renderScene() {
+    getShaders()->ResetObjectState();
     getShaders()->ResetBaseColor();
     getShaders()->SetObjectTransform(ysMath::LoadIdentity());
 

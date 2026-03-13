@@ -168,6 +168,7 @@ Bounds UiElement::unitsToPixels(const Bounds &b) const {
 }
 
 void UiElement::resetShader() {
+    m_app->getShaders()->ResetObjectState();
     m_app->getShaders()->ResetBaseColor();
     m_app->getShaders()->SetObjectTransform(ysMath::LoadIdentity());
 }
@@ -257,6 +258,31 @@ void UiElement::drawBox(const Bounds &bounds, const ysVector &fillColor) {
     resetShader();
     m_app->getShaders()->SetBaseColor(fillColor);
     m_app->drawGenerated(body, 0x11, m_app->getShaders()->GetUiFlags());
+}
+
+void UiElement::drawImage(
+        ysTexture *texture,
+        const Bounds &bounds,
+        const ysVector &tint)
+{
+    if (texture == nullptr) return;
+
+    resetShader();
+
+    const Bounds worldBounds = getRenderBounds(bounds);
+    const Point center = worldBounds.getPosition(Bounds::center);
+
+    m_app->getShaders()->SetObjectTransform(
+        ysMath::TranslationTransform(ysMath::LoadVector(center.x, center.y, 0.0f)));
+    m_app->getShaders()->SetScale(worldBounds.width() / 2.0f, worldBounds.height() / 2.0f, 1.0f);
+    m_app->getShaders()->SetColorReplace(false);
+    m_app->getShaders()->SetLit(false);
+    m_app->getShaders()->SetBaseColor(tint);
+    m_app->getShaders()->SetUiDiffuseTexture(texture);
+
+    m_app->getEngine()->DrawImage(m_app->getShaders()->GetUiFlags(), texture, 0x11);
+
+    resetShader();
 }
 
 void UiElement::drawText(
