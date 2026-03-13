@@ -324,10 +324,6 @@ void OscilloscopeCluster::render() {
 }
 
 void OscilloscopeCluster::sample() {
-    if (m_engineWearModeEnabled) {
-        return;
-    }
-
     Engine *engine = m_simulator->getEngine();
     if (engine == nullptr) return;
 

@@ -1,13 +1,23 @@
 #include "ui/engine_wear_cluster.h"
 
 #include "app/engine_sim_application.h"
+#include "constants.h"
 #include "simulation/simulator.h"
+#include "ui/gauge.h"
 #include "ui/ui_utilities.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 
 namespace {
+    struct RankedMetric {
+        const char *label;
+        const std::string *valueText;
+        float ratio;
+        float risk;
+    };
+
     float clamp01(float value) {
         return std::clamp(value, 0.0f, 1.0f);
     }
@@ -65,10 +75,46 @@ namespace {
         std::snprintf(buffer, sizeof(buffer), "%d", value);
         return buffer;
     }
+
+    void configureReserveGauge(Gauge *gauge, const EngineSimApplication *app, bool inverseBands) {
+        gauge->m_min = 0.0f;
+        gauge->m_max = 100.0f;
+        gauge->m_minorStep = 5;
+        gauge->m_majorStep = 10;
+        gauge->m_maxMinorTick = 100;
+        gauge->m_thetaMin = static_cast<float>(constants::pi) * 1.2f;
+        gauge->m_thetaMax = -static_cast<float>(constants::pi) * 0.2f;
+        gauge->m_minorTickWidth = 1.0f;
+        gauge->m_majorTickWidth = 2.0f;
+        gauge->m_minorTickLength = 5.0f;
+        gauge->m_majorTickLength = 10.0f;
+        gauge->m_needleWidth = 3.0f;
+        gauge->m_gamma = 1.0f;
+        gauge->m_needleKs = 1000.0f;
+        gauge->m_needleKd = 20.0f;
+        gauge->m_needleMaxVelocity = 2.0f;
+        gauge->m_center = { 0.0f, -6.0f };
+        gauge->setBandCount(3);
+
+        if (inverseBands) {
+            gauge->setBand({ app->getRed(), 0.0f, 40.0f, 3.0f, 6.0f }, 0);
+            gauge->setBand({ app->getOrange(), 40.0f, 70.0f, 3.0f, 6.0f }, 1);
+            gauge->setBand({ app->getGreen(), 70.0f, 100.0f, 3.0f, 6.0f }, 2);
+        }
+        else {
+            gauge->setBand({ app->getGreen(), 0.0f, 40.0f, 3.0f, 6.0f }, 0);
+            gauge->setBand({ app->getYellow(), 40.0f, 70.0f, 3.0f, 6.0f }, 1);
+            gauge->setBand({ app->getRed(), 70.0f, 100.0f, 3.0f, 6.0f }, 2);
+        }
+    }
 }
 
 EngineWearCluster::EngineWearCluster() {
     m_simulator = nullptr;
+    m_healthGauge = nullptr;
+    m_thermalGauge = nullptr;
+    m_lubricationGauge = nullptr;
+    m_detonationGauge = nullptr;
     m_cachedRevision = 0;
     m_state = EngineWearState{};
 
@@ -76,7 +122,7 @@ EngineWearCluster::EngineWearCluster() {
     m_damageRateText = "0.00%/h";
     m_rulText = "999+h";
     m_confidenceText = "100%";
-    m_failureModeText = "balanced";
+    m_failureModeText = "BALANCED";
     m_oilTemperatureText = "90C";
     m_coolantTemperatureText = "88C";
 
@@ -106,6 +152,16 @@ EngineWearCluster::~EngineWearCluster() {
 
 void EngineWearCluster::initialize(EngineSimApplication *app) {
     UiElement::initialize(app);
+
+    m_healthGauge = addElement<Gauge>();
+    m_thermalGauge = addElement<Gauge>();
+    m_lubricationGauge = addElement<Gauge>();
+    m_detonationGauge = addElement<Gauge>();
+
+    configureReserveGauge(m_healthGauge, app, true);
+    configureReserveGauge(m_thermalGauge, app, true);
+    configureReserveGauge(m_lubricationGauge, app, true);
+    configureReserveGauge(m_detonationGauge, app, true);
 }
 
 void EngineWearCluster::destroy() {
@@ -148,24 +204,26 @@ void EngineWearCluster::renderDashboard(const Bounds &bounds) {
     const Bounds headerBounds = inner.verticalSplit(0.94f, 1.0f);
     const Bounds bodyBounds = inner.verticalSplit(0.0f, 0.92f);
     drawText("ENGINE WEAR", headerBounds, sectionSize, Bounds::tl);
-    drawAlignedText("[J]", headerBounds, bodySize, Bounds::tr, Bounds::tr);
+    drawAlignedText("[J] MODEL LIVE", headerBounds, bodySize, Bounds::tr, Bounds::tr);
 
-    const Bounds leftColumn = bodyBounds.horizontalSplit(0.0f, 0.36f);
-    const Bounds rightColumn = bodyBounds.horizontalSplit(0.39f, 1.0f);
+    const Bounds kpiBounds = bodyBounds.verticalSplit(0.76f, 1.0f);
+    const Bounds detailBounds = bodyBounds.verticalSplit(0.0f, 0.72f);
+    const Bounds leftColumn = detailBounds.horizontalSplit(0.0f, 0.34f);
+    const Bounds rightColumn = detailBounds.horizontalSplit(0.37f, 1.0f);
+    const Bounds focusBounds = leftColumn.verticalSplit(0.44f, 1.0f);
+    const Bounds exposureBounds = leftColumn.verticalSplit(0.0f, 0.40f);
+    const Bounds stressBounds = rightColumn.verticalSplit(0.50f, 1.0f);
+    const Bounds damageBounds = rightColumn.verticalSplit(0.0f, 0.46f);
 
-    const Bounds overviewBounds = leftColumn.verticalSplit(0.42f, 1.0f);
-    const Bounds exposureBounds = leftColumn.verticalSplit(0.0f, 0.39f);
-    const Bounds liveStressBounds = rightColumn.verticalSplit(0.48f, 1.0f);
-    const Bounds damageBounds = rightColumn.verticalSplit(0.0f, 0.45f);
-
-    drawFrame(overviewBounds, 1.0f, fg, mix(getRiskColor(1.0f - m_state.globalHealth), bg, 0.90f));
+    renderKpiStrip(kpiBounds);
+    drawFrame(focusBounds, 1.0f, fg, mix(getRiskColor(1.0f - m_state.globalHealth), bg, 0.92f));
     drawFrame(exposureBounds, 1.0f, fg, bg);
-    drawFrame(liveStressBounds, 1.0f, fg, bg);
+    drawFrame(stressBounds, 1.0f, fg, bg);
     drawFrame(damageBounds, 1.0f, fg, bg);
 
-    renderOverviewPanel(overviewBounds.inset(10.0f));
+    renderOverviewPanel(focusBounds.inset(10.0f));
     renderExposurePanel(exposureBounds.inset(10.0f));
-    renderLiveStressPanel(liveStressBounds.inset(10.0f));
+    renderLiveStressPanel(stressBounds.inset(10.0f));
     renderDamagePanel(damageBounds.inset(10.0f));
 }
 
@@ -204,6 +262,13 @@ void EngineWearCluster::refreshCachedStrings() {
     m_oilStarvationText = formatDuration(m_state.oilStarvationSeconds);
     m_knockEventText = formatCount(m_state.severeKnockEvents);
     m_thermalCyclesText = formatCount(m_state.thermalCycles);
+
+    if (m_healthGauge != nullptr) {
+        m_healthGauge->m_value = m_state.globalHealth * 100.0f;
+        m_thermalGauge->m_value = m_state.thermalMargin * 100.0f;
+        m_lubricationGauge->m_value = m_state.lubricationMargin * 100.0f;
+        m_detonationGauge->m_value = m_state.detonationMargin * 100.0f;
+    }
 }
 
 void EngineWearCluster::renderSummary(const Bounds &bounds) {
@@ -218,40 +283,125 @@ void EngineWearCluster::renderSummary(const Bounds &bounds) {
         return;
     }
 
-    drawAlignedText(m_healthText, inner.verticalSplit(0.50f, 0.78f), 40.0f, Bounds::center, Bounds::center);
-    drawAlignedText(m_damageRateText, inner.verticalSplit(0.32f, 0.44f), 14.0f, Bounds::center, Bounds::center);
-    drawText(m_failureModeText, inner.verticalSplit(0.18f, 0.28f), 13.0f, Bounds::lm);
+    drawAlignedText(m_healthText, inner.verticalSplit(0.52f, 0.80f), 40.0f, Bounds::center, Bounds::center);
+    drawAlignedText(m_failureModeText, inner.verticalSplit(0.38f, 0.48f), 16.0f, Bounds::center, Bounds::center);
+    drawInfoRow(inner.verticalSplit(0.18f, 0.30f), "RATE", m_damageRateText, 13.0f);
+    drawInfoRow(inner.verticalSplit(0.08f, 0.18f), "RUL", m_rulText, 13.0f);
 
-    const Bounds barBounds = inner.verticalSplit(0.06f, 0.16f);
+    const Bounds barBounds = inner.verticalSplit(0.00f, 0.06f);
     drawBox(barBounds, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.88f));
     drawBox(
         Bounds(barBounds.width() * m_state.globalHealth, barBounds.height(), barBounds.getPosition(Bounds::bl), Bounds::bl),
         getRiskColor(1.0f - m_state.globalHealth));
 }
 
-void EngineWearCluster::renderOverviewPanel(const Bounds &bounds) {
-    const float titleSize = std::clamp(bounds.height() * 0.10f, 14.0f, 18.0f);
-    const float bodySize = std::clamp(bounds.height() * 0.07f, 11.0f, 15.0f);
-    const float valueSize = std::clamp(bounds.height() * 0.20f, 34.0f, 54.0f);
+void EngineWearCluster::renderKpiStrip(const Bounds &bounds) {
+    const ysVector bg = m_app->getBackgroundColor();
+    const float valueSize = std::clamp(bounds.height() * 0.20f, 16.0f, 24.0f);
+    const float modeValueSize = std::clamp(bounds.height() * 0.16f, 13.0f, 20.0f);
 
-    drawText("OVERVIEW", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
-    drawAlignedText(m_confidenceText, bounds.verticalSplit(0.90f, 1.0f), bodySize, Bounds::tr, Bounds::tr);
-    drawAlignedText(m_healthText, bounds.verticalSplit(0.56f, 0.86f), valueSize, Bounds::center, Bounds::center);
-    drawAlignedText(m_failureModeText, bounds.verticalSplit(0.46f, 0.54f), bodySize, Bounds::center, Bounds::center);
+    renderGaugeTile(
+        bounds.horizontalSplit(0.00f, 0.18f),
+        "HEALTH",
+        m_healthText,
+        m_healthGauge,
+        m_state.globalHealth,
+        mix(getRiskColor(1.0f - m_state.globalHealth), bg, 0.92f));
+    renderGaugeTile(
+        bounds.horizontalSplit(0.20f, 0.38f),
+        "THERMAL RES",
+        m_thermalMarginText,
+        m_thermalGauge,
+        m_state.thermalMargin,
+        mix(getRiskColor(1.0f - m_state.thermalMargin), bg, 0.95f));
+    renderGaugeTile(
+        bounds.horizontalSplit(0.40f, 0.58f),
+        "LUBE RES",
+        m_lubricationMarginText,
+        m_lubricationGauge,
+        m_state.lubricationMargin,
+        mix(getRiskColor(1.0f - m_state.lubricationMargin), bg, 0.95f));
+    renderGaugeTile(
+        bounds.horizontalSplit(0.60f, 0.78f),
+        "DET RES",
+        m_detonationMarginText,
+        m_detonationGauge,
+        m_state.detonationMargin,
+        mix(getRiskColor(1.0f - m_state.detonationMargin), bg, 0.95f));
+    renderKpiTile(
+        bounds.horizontalSplit(0.80f, 1.00f),
+        "MODEL OUTPUT",
+        m_rulText,
+        m_damageRateText + "  //  CONF " + m_confidenceText,
+        mix(m_app->getBlue(), bg, 0.95f),
+        modeValueSize);
+}
+
+void EngineWearCluster::renderKpiTile(
+    const Bounds &bounds,
+    const std::string &label,
+    const std::string &valueText,
+    const std::string &detailText,
+    const ysVector &fillColor,
+    float valueSize)
+{
+    const Bounds tile = bounds.inset(1.0f);
+    const float titleSize = std::clamp(tile.height() * 0.16f, 11.0f, 14.0f);
+    const float detailSize = std::clamp(tile.height() * 0.14f, 10.0f, 13.0f);
+
+    drawFrame(tile, 1.0f, m_app->getForegroundColor(), fillColor);
+    drawText(label, tile.inset(8.0f).verticalSplit(0.76f, 1.0f), titleSize, Bounds::tl);
+    drawAlignedText(valueText, tile.inset(8.0f).verticalSplit(0.28f, 0.72f), valueSize, Bounds::center, Bounds::center);
+    drawAlignedText(detailText, tile.inset(8.0f).verticalSplit(0.04f, 0.18f), detailSize, Bounds::center, Bounds::center);
+}
+
+void EngineWearCluster::renderGaugeTile(
+    const Bounds &bounds,
+    const std::string &label,
+    const std::string &valueText,
+    Gauge *gauge,
+    float gaugeValue,
+    const ysVector &fillColor)
+{
+    const Bounds tile = bounds.inset(1.0f);
+    const float titleSize = std::clamp(tile.height() * 0.12f, 10.0f, 13.0f);
+    const float valueSize = std::clamp(tile.height() * 0.14f, 11.0f, 16.0f);
+    const Bounds gaugeBounds = tile.inset(8.0f).verticalSplit(0.18f, 0.84f);
+
+    drawFrame(tile, 1.0f, m_app->getForegroundColor(), fillColor);
+    drawText(label, tile.inset(8.0f).verticalSplit(0.82f, 1.0f), titleSize, Bounds::tl);
+    drawAlignedText(valueText, tile.inset(8.0f).verticalSplit(0.02f, 0.14f), valueSize, Bounds::center, Bounds::center);
+
+    gauge->m_value = gaugeValue * 100.0f;
+    gauge->m_bounds = gaugeBounds;
+    gauge->m_outerRadius = std::fmin(gaugeBounds.width(), gaugeBounds.height()) * 0.5f;
+    gauge->m_needleOuterRadius = gauge->m_outerRadius * 0.72f;
+    gauge->m_needleInnerRadius = -gauge->m_outerRadius * 0.08f;
+    gauge->render();
+}
+
+void EngineWearCluster::renderOverviewPanel(const Bounds &bounds) {
+    const float titleSize = std::clamp(bounds.height() * 0.11f, 14.0f, 18.0f);
+    const float bodySize = std::clamp(bounds.height() * 0.07f, 11.0f, 15.0f);
+    const float modeSize = std::clamp(bounds.height() * 0.11f, 18.0f, 26.0f);
+
+    drawText("INSPECTION FOCUS", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+    drawAlignedText(m_failureModeText, bounds.verticalSplit(0.64f, 0.82f), modeSize, Bounds::center, Bounds::center);
+    drawAlignedText(getFailureModeAction(m_state.dominantFailureMode), bounds.verticalSplit(0.50f, 0.60f), bodySize, Bounds::center, Bounds::center);
 
     Grid infoGrid{ 1, 4 };
-    const Bounds infoRows = bounds.verticalSplit(0.0f, 0.42f);
-    drawInfoRow(infoGrid.get(infoRows, 0, 3), "RATE", m_damageRateText, bodySize);
-    drawInfoRow(infoGrid.get(infoRows, 0, 2), "RUL", m_rulText, bodySize);
-    drawInfoRow(infoGrid.get(infoRows, 0, 1), "OIL", m_oilTemperatureText, bodySize);
-    drawInfoRow(infoGrid.get(infoRows, 0, 0), "COOLANT", m_coolantTemperatureText, bodySize);
+    const Bounds rows = bounds.verticalSplit(0.0f, 0.42f);
+    drawInfoRow(infoGrid.get(rows, 0, 3), "TOP DAMAGE", getTopDamageLabel(), bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 2), "TOP STRESS", getTopStressLabel(), bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 1), "OIL TEMP", m_oilTemperatureText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 0), "COOLANT", m_coolantTemperatureText, bodySize);
 }
 
 void EngineWearCluster::renderExposurePanel(const Bounds &bounds) {
     const float titleSize = std::clamp(bounds.height() * 0.12f, 14.0f, 18.0f);
     const float bodySize = std::clamp(bounds.height() * 0.10f, 11.0f, 15.0f);
 
-    drawText("EXPOSURE", bounds.verticalSplit(0.88f, 1.0f), titleSize, Bounds::tl);
+    drawText("DUTY HISTORY", bounds.verticalSplit(0.88f, 1.0f), titleSize, Bounds::tl);
 
     Grid infoGrid{ 1, 6 };
     const Bounds rows = bounds.verticalSplit(0.0f, 0.82f);
@@ -259,34 +409,54 @@ void EngineWearCluster::renderExposurePanel(const Bounds &bounds) {
     drawInfoRow(infoGrid.get(rows, 0, 4), "OVERTEMP", m_overTempText, bodySize);
     drawInfoRow(infoGrid.get(rows, 0, 3), "COLD LOAD", m_coldLoadText, bodySize);
     drawInfoRow(infoGrid.get(rows, 0, 2), "OIL STARVE", m_oilStarvationText, bodySize);
-    drawInfoRow(infoGrid.get(rows, 0, 1), "KNOCK EV", m_knockEventText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 1), "SEV KNOCK", m_knockEventText, bodySize);
     drawInfoRow(infoGrid.get(rows, 0, 0), "HEAT CYC", m_thermalCyclesText, bodySize);
 }
 
 void EngineWearCluster::renderLiveStressPanel(const Bounds &bounds) {
+    std::array<RankedMetric, 5> metrics = {{
+        { "THERMAL RES", &m_thermalMarginText, m_state.thermalMargin, 1.0f - m_state.thermalMargin },
+        { "LUBE RES", &m_lubricationMarginText, m_state.lubricationMargin, 1.0f - m_state.lubricationMargin },
+        { "DET RES", &m_detonationMarginText, m_state.detonationMargin, 1.0f - m_state.detonationMargin },
+        { "FATIGUE LOAD", &m_fatigueLoadText, m_state.mechanicalFatigueLoad, m_state.mechanicalFatigueLoad },
+        { "COMB STAB", &m_combustionStabilityText, m_state.combustionStability, 1.0f - m_state.combustionStability }
+    }};
+
+    std::sort(metrics.begin(), metrics.end(), [](const RankedMetric &a, const RankedMetric &b) {
+        return a.risk > b.risk;
+    });
+
     const float titleSize = std::clamp(bounds.height() * 0.08f, 14.0f, 18.0f);
-    drawText("LIVE STRESS", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+    drawText("OPERATING MARGINS", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
 
     Grid metricGrid{ 1, 5 };
     const Bounds rows = bounds.verticalSplit(0.0f, 0.84f);
-    drawMetricRow(metricGrid.get(rows, 0, 4), "THERMAL", m_thermalMarginText, m_state.thermalMargin, 1.0f - m_state.thermalMargin);
-    drawMetricRow(metricGrid.get(rows, 0, 3), "LUBE", m_lubricationMarginText, m_state.lubricationMargin, 1.0f - m_state.lubricationMargin);
-    drawMetricRow(metricGrid.get(rows, 0, 2), "DET MARGIN", m_detonationMarginText, m_state.detonationMargin, 1.0f - m_state.detonationMargin);
-    drawMetricRow(metricGrid.get(rows, 0, 1), "FATIGUE", m_fatigueLoadText, m_state.mechanicalFatigueLoad, m_state.mechanicalFatigueLoad);
-    drawMetricRow(metricGrid.get(rows, 0, 0), "STABILITY", m_combustionStabilityText, m_state.combustionStability, 1.0f - m_state.combustionStability);
+    for (int i = 0; i < 5; ++i) {
+        drawMetricRow(metricGrid.get(rows, 0, 4 - i), metrics[i].label, *metrics[i].valueText, metrics[i].ratio, metrics[i].risk);
+    }
 }
 
 void EngineWearCluster::renderDamagePanel(const Bounds &bounds) {
+    std::array<RankedMetric, 5> metrics = {{
+        { "BOTTOM END", &m_bottomEndDamageText, m_state.bottomEndDamage, m_state.bottomEndDamage },
+        { "RING SEAL", &m_ringSealDamageText, m_state.ringSealDamage, m_state.ringSealDamage },
+        { "VALVETRAIN", &m_valvetrainDamageText, m_state.valvetrainDamage, m_state.valvetrainDamage },
+        { "HEAD/GASKET", &m_headGasketDamageText, m_state.headGasketDamage, m_state.headGasketDamage },
+        { "LUBE SYS", &m_lubricationDamageText, m_state.lubricationSystemDamage, m_state.lubricationSystemDamage }
+    }};
+
+    std::sort(metrics.begin(), metrics.end(), [](const RankedMetric &a, const RankedMetric &b) {
+        return a.risk > b.risk;
+    });
+
     const float titleSize = std::clamp(bounds.height() * 0.08f, 14.0f, 18.0f);
-    drawText("DAMAGE BREAKDOWN", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+    drawText("ACCUMULATED DAMAGE", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
 
     Grid metricGrid{ 1, 5 };
     const Bounds rows = bounds.verticalSplit(0.0f, 0.84f);
-    drawMetricRow(metricGrid.get(rows, 0, 4), "BOTTOM END", m_bottomEndDamageText, m_state.bottomEndDamage, m_state.bottomEndDamage);
-    drawMetricRow(metricGrid.get(rows, 0, 3), "RING SEAL", m_ringSealDamageText, m_state.ringSealDamage, m_state.ringSealDamage);
-    drawMetricRow(metricGrid.get(rows, 0, 2), "VALVETRAIN", m_valvetrainDamageText, m_state.valvetrainDamage, m_state.valvetrainDamage);
-    drawMetricRow(metricGrid.get(rows, 0, 1), "HEAD/GASKET", m_headGasketDamageText, m_state.headGasketDamage, m_state.headGasketDamage);
-    drawMetricRow(metricGrid.get(rows, 0, 0), "LUBE SYS", m_lubricationDamageText, m_state.lubricationSystemDamage, m_state.lubricationSystemDamage);
+    for (int i = 0; i < 5; ++i) {
+        drawMetricRow(metricGrid.get(rows, 0, 4 - i), metrics[i].label, *metrics[i].valueText, metrics[i].ratio, metrics[i].risk);
+    }
 }
 
 void EngineWearCluster::drawMetricRow(
@@ -297,12 +467,12 @@ void EngineWearCluster::drawMetricRow(
     float risk)
 {
     const Bounds row = bounds.inset(2.0f);
-    const Bounds barBounds = row.horizontalSplit(0.32f, 0.82f).verticalSplit(0.22f, 0.72f);
+    const Bounds barBounds = row.horizontalSplit(0.34f, 0.84f).verticalSplit(0.22f, 0.72f);
     const float textSize = std::clamp(row.height() * 0.42f, 11.0f, 15.0f);
 
-    drawText(label, row.horizontalSplit(0.0f, 0.30f), textSize, Bounds::lm);
-    drawAlignedText(valueText, row.horizontalSplit(0.84f, 1.0f), textSize, Bounds::rm, Bounds::rm);
-    drawBox(barBounds, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.88f));
+    drawText(label, row.horizontalSplit(0.0f, 0.32f), textSize, Bounds::lm);
+    drawAlignedText(valueText, row.horizontalSplit(0.86f, 1.0f), textSize, Bounds::rm, Bounds::rm);
+    drawBox(barBounds, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.85f));
     drawBox(
         Bounds(barBounds.width() * clamp01(displayRatio), barBounds.height(), barBounds.getPosition(Bounds::bl), Bounds::bl),
         getRiskColor(risk));
@@ -333,22 +503,97 @@ ysVector EngineWearCluster::getRiskColor(float risk) const {
 const char *EngineWearCluster::getFailureModeLabel(EngineWearState::FailureMode mode) const {
     switch (mode) {
     case EngineWearState::FailureMode::Balanced:
-        return "balanced";
+        return "BALANCED";
     case EngineWearState::FailureMode::ThermalOverload:
-        return "thermal overload";
+        return "THERMAL OVERLOAD";
     case EngineWearState::FailureMode::LubricationBreakdown:
-        return "lubrication breakdown";
+        return "LUBRICATION BREAKDOWN";
     case EngineWearState::FailureMode::DetonationDamage:
-        return "detonation damage";
+        return "DETONATION DAMAGE";
     case EngineWearState::FailureMode::BottomEndFatigue:
-        return "bottom-end fatigue";
+        return "BOTTOM-END FATIGUE";
     case EngineWearState::FailureMode::RingSealWear:
-        return "ring seal wear";
+        return "RING SEAL WEAR";
     case EngineWearState::FailureMode::ValvetrainFatigue:
-        return "valvetrain fatigue";
+        return "VALVETRAIN FATIGUE";
     case EngineWearState::FailureMode::HeadGasketRisk:
-        return "head gasket risk";
+        return "HEAD GASKET RISK";
     }
 
-    return "balanced";
+    return "BALANCED";
+}
+
+const char *EngineWearCluster::getFailureModeAction(EngineWearState::FailureMode mode) const {
+    switch (mode) {
+    case EngineWearState::FailureMode::Balanced:
+        return "NO DOMINANT FAILURE VECTOR";
+    case EngineWearState::FailureMode::ThermalOverload:
+        return "TRACK COOLING RESERVE + HOT ZONES";
+    case EngineWearState::FailureMode::LubricationBreakdown:
+        return "CHECK OIL FILM + STARVATION RISK";
+    case EngineWearState::FailureMode::DetonationDamage:
+        return "REDUCE KNOCK ENERGY AT LOAD";
+    case EngineWearState::FailureMode::BottomEndFatigue:
+        return "INSPECT ROD AND MAIN BEARING LOAD";
+    case EngineWearState::FailureMode::RingSealWear:
+        return "CHECK COMPRESSION AND BLOW-BY TREND";
+    case EngineWearState::FailureMode::ValvetrainFatigue:
+        return "CHECK VALVE MOTION AND SEAT LOAD";
+    case EngineWearState::FailureMode::HeadGasketRisk:
+        return "CHECK HEAD CLAMP AND THERMAL GRADIENT";
+    }
+
+    return "NO DOMINANT FAILURE VECTOR";
+}
+
+const char *EngineWearCluster::getTopDamageLabel() const {
+    const float damage[] = {
+        m_state.bottomEndDamage,
+        m_state.ringSealDamage,
+        m_state.valvetrainDamage,
+        m_state.headGasketDamage,
+        m_state.lubricationSystemDamage
+    };
+    const char *labels[] = {
+        "BOTTOM END",
+        "RING SEAL",
+        "VALVETRAIN",
+        "HEAD/GASKET",
+        "LUBE SYS"
+    };
+
+    int maxIndex = 0;
+    for (int i = 1; i < 5; ++i) {
+        if (damage[i] > damage[maxIndex]) {
+            maxIndex = i;
+        }
+    }
+
+    return labels[maxIndex];
+}
+
+const char *EngineWearCluster::getTopStressLabel() const {
+    const float stress[] = {
+        1.0f - m_state.thermalMargin,
+        1.0f - m_state.lubricationMargin,
+        1.0f - m_state.detonationMargin,
+        m_state.mechanicalFatigueLoad,
+        1.0f - m_state.combustionStability
+    };
+    const char *labels[] = {
+        "THERMAL RESERVE",
+        "LUBE RESERVE",
+        "DET RESERVE",
+        "FATIGUE LOAD",
+        "COMB STABILITY"
+    };
+
+    int maxIndex = 0;
+    for (int i = 1; i < 5; ++i) {
+        if (stress[i] > stress[maxIndex]) {
+            maxIndex = i;
+        }
+    }
+
+    return labels[maxIndex];
 }

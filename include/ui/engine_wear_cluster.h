@@ -8,6 +8,7 @@
 #include <string>
 
 class Simulator;
+class Gauge;
 
 class EngineWearCluster : public UiElement {
     public:
@@ -25,6 +26,21 @@ class EngineWearCluster : public UiElement {
     private:
         void refreshCachedStrings();
         void renderSummary(const Bounds &bounds);
+        void renderKpiStrip(const Bounds &bounds);
+        void renderKpiTile(
+            const Bounds &bounds,
+            const std::string &label,
+            const std::string &valueText,
+            const std::string &detailText,
+            const ysVector &fillColor,
+            float valueSize);
+        void renderGaugeTile(
+            const Bounds &bounds,
+            const std::string &label,
+            const std::string &valueText,
+            Gauge *gauge,
+            float gaugeValue,
+            const ysVector &fillColor);
         void renderOverviewPanel(const Bounds &bounds);
         void renderExposurePanel(const Bounds &bounds);
         void renderLiveStressPanel(const Bounds &bounds);
@@ -43,9 +59,16 @@ class EngineWearCluster : public UiElement {
 
         ysVector getRiskColor(float risk) const;
         const char *getFailureModeLabel(EngineWearState::FailureMode mode) const;
+        const char *getFailureModeAction(EngineWearState::FailureMode mode) const;
+        const char *getTopDamageLabel() const;
+        const char *getTopStressLabel() const;
 
     private:
         Simulator *m_simulator;
+        Gauge *m_healthGauge;
+        Gauge *m_thermalGauge;
+        Gauge *m_lubricationGauge;
+        Gauge *m_detonationGauge;
         EngineWearState m_state;
         std::uint64_t m_cachedRevision;
 
