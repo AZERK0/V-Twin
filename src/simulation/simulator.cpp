@@ -15,6 +15,7 @@ Simulator::Simulator() {
     m_targetSynthesizerLatency = 0.1;
     m_simulationFrequency = 10000;
     m_steps = 0;
+    m_frameDt = 0.0;
 
     m_currentIteration = 0;
 
@@ -55,6 +56,7 @@ void Simulator::loadSimulation(Engine *engine, Vehicle *vehicle, Transmission *t
     m_engine = engine;
     m_vehicle = vehicle;
     m_transmission = transmission;
+    m_engineWearModel.reset();
 }
 
 void Simulator::releaseSimulation() {
@@ -70,6 +72,7 @@ void Simulator::startFrame(double dt) {
         return;
     }
 
+    m_frameDt = dt;
     m_simulationStart = std::chrono::steady_clock::now();
     m_currentIteration = 0;
     m_synthesizer.setInputSampleRate(m_simulationFrequency * m_simulationSpeed);
@@ -164,6 +167,10 @@ int Simulator::readAudioOutput(int samples, int16_t *target) {
 }
 
 void Simulator::endFrame() {
+    if (m_engine != nullptr && m_frameDt > 0.0) {
+        m_engineWearModel.update(*this, m_frameDt * m_simulationSpeed);
+    }
+
     m_synthesizer.endInputBlock();
 }
 
@@ -171,6 +178,7 @@ void Simulator::destroy() {
     if (m_dynoTorqueSamples != nullptr) delete[] m_dynoTorqueSamples;
     m_dynoTorqueSamples = nullptr;
     m_synthesizer.destroy();
+    m_engineWearModel.reset();
 }
 
 void Simulator::startAudioRenderingThread() {

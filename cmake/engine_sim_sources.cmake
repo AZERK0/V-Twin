@@ -28,6 +28,7 @@ set(ENGINE_SIM_CORE_SOURCES
     src/audio/low_pass_filter.cpp
     src/domain/engine/part.cpp
     src/domain/engine/piston.cpp
+    src/simulation/engine_wear_model.cpp
     src/simulation/piston_engine_simulator.cpp
     src/simulation/simulator.cpp
     src/domain/engine/standard_valvetrain.cpp
@@ -73,6 +74,7 @@ set(ENGINE_SIM_CORE_HEADERS
     include/audio/low_pass_filter.h
     include/domain/engine/part.h
     include/domain/engine/piston.h
+    include/simulation/engine_wear_model.h
     include/simulation/piston_engine_simulator.h
     include/simulation/simulator.h
     include/domain/engine/standard_valvetrain.h

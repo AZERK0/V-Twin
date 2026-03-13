@@ -6,6 +6,7 @@
 #include "domain/vehicle/dynamometer.h"
 #include "domain/vehicle/starter_motor.h"
 #include "domain/vehicle/vehicle_drag_constraint.h"
+#include "simulation/engine_wear_model.h"
 
 #include <chrono>
 
@@ -73,6 +74,8 @@ public:
     virtual double getDynoPower() const;
     virtual double getAverageOutputSignal() const;
 
+    const EngineWearState &getEngineWearState() const { return m_engineWearModel.getState(); }
+
     double filteredEngineSpeed() const { return m_filteredEngineSpeed; }
 
     Dynamometer m_dyno;
@@ -105,6 +108,7 @@ private:
     double m_physicsProcessingTime;
 
     int m_simulationFrequency;
+    double m_frameDt;
 
     double m_targetSynthesizerLatency;
     double m_simulationSpeed;
@@ -113,6 +117,8 @@ private:
     int m_lastDynoTorqueSample;
 
     double m_filteredEngineSpeed;
+
+    EngineWearModel m_engineWearModel;
 
     int m_steps;
 };

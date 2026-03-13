@@ -264,6 +264,11 @@ void OscilloscopeCluster::update(float dt) {
 
     m_updateTimer -= dt;
 
+    if (m_engineWearModeEnabled) {
+        m_engineWearCluster->update(dt);
+        return;
+    }
+
     UiElement::update(dt);
 }
 
@@ -319,6 +324,10 @@ void OscilloscopeCluster::render() {
 }
 
 void OscilloscopeCluster::sample() {
+    if (m_engineWearModeEnabled) {
+        return;
+    }
+
     Engine *engine = m_simulator->getEngine();
     if (engine == nullptr) return;
 

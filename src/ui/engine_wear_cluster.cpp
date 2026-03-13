@@ -3,48 +3,101 @@
 #include "app/engine_sim_application.h"
 #include "simulation/simulator.h"
 #include "ui/ui_utilities.h"
-#include "units.h"
 
 #include <algorithm>
-#include <cmath>
-#include <iomanip>
-#include <sstream>
+#include <cstdio>
 
 namespace {
     float clamp01(float value) {
         return std::clamp(value, 0.0f, 1.0f);
     }
 
-    float smoothValue(float current, float target, float dt, float response) {
-        const float alpha = 1.0f - std::exp(-dt * response);
-        return current + (target - current) * alpha;
+    std::string formatPercent(float value, int precision = 0) {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%.*f%%", precision, value * 100.0f);
+        return buffer;
     }
 
-    std::string formatValue(float value, int precision, const std::string &suffix = "") {
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(precision) << value << suffix;
-        return stream.str();
+    std::string formatRate(float valuePerHour) {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%.2f%%/h", valuePerHour);
+        return buffer;
+    }
+
+    std::string formatHours(float hours) {
+        char buffer[32];
+        if (hours >= 999.0f) {
+            std::snprintf(buffer, sizeof(buffer), "999+h");
+        }
+        else if (hours >= 100.0f) {
+            std::snprintf(buffer, sizeof(buffer), "%.0fh", hours);
+        }
+        else {
+            std::snprintf(buffer, sizeof(buffer), "%.1fh", hours);
+        }
+
+        return buffer;
+    }
+
+    std::string formatTemperature(float temperatureC) {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%.0fC", temperatureC);
+        return buffer;
+    }
+
+    std::string formatDuration(float seconds) {
+        char buffer[32];
+        if (seconds >= 3600.0f) {
+            std::snprintf(buffer, sizeof(buffer), "%.1fh", seconds / 3600.0f);
+        }
+        else if (seconds >= 60.0f) {
+            std::snprintf(buffer, sizeof(buffer), "%.0fm", seconds / 60.0f);
+        }
+        else {
+            std::snprintf(buffer, sizeof(buffer), "%.0fs", seconds);
+        }
+
+        return buffer;
+    }
+
+    std::string formatCount(int value) {
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%d", value);
+        return buffer;
     }
 }
 
 EngineWearCluster::EngineWearCluster() {
     m_simulator = nullptr;
-    m_severityHistory.fill(0.0f);
-    m_historyCount = 0;
-    m_historyWriteIndex = 0;
-    m_elapsedTime = 0.0f;
-    m_engineHealth = 0.82f;
-    m_wearRatePerMinute = 0.35f;
-    m_thermalStress = 0.38f;
-    m_lubricationReserve = 0.74f;
-    m_knockExposure = 0.22f;
-    m_bearingStress = 0.34f;
-    m_ringSealLoss = 0.18f;
-    m_valvetrainFatigue = 0.27f;
-    m_headThermalLoad = 0.31f;
-    m_oilTemperature = 97.0f;
-    m_coolantTemperature = 91.0f;
-    m_blowBy = 0.14f;
+    m_cachedRevision = 0;
+    m_state = EngineWearState{};
+
+    m_healthText = "100%";
+    m_damageRateText = "0.00%/h";
+    m_rulText = "999+h";
+    m_confidenceText = "100%";
+    m_failureModeText = "balanced";
+    m_oilTemperatureText = "90C";
+    m_coolantTemperatureText = "88C";
+
+    m_thermalMarginText = "100%";
+    m_lubricationMarginText = "100%";
+    m_detonationMarginText = "100%";
+    m_fatigueLoadText = "0%";
+    m_combustionStabilityText = "100%";
+
+    m_bottomEndDamageText = "0%";
+    m_ringSealDamageText = "0%";
+    m_valvetrainDamageText = "0%";
+    m_headGasketDamageText = "0%";
+    m_lubricationDamageText = "0%";
+
+    m_overRevText = "0s";
+    m_overTempText = "0s";
+    m_coldLoadText = "0s";
+    m_oilStarvationText = "0s";
+    m_knockEventText = "0";
+    m_thermalCyclesText = "0";
 }
 
 EngineWearCluster::~EngineWearCluster() {
@@ -61,7 +114,15 @@ void EngineWearCluster::destroy() {
 
 void EngineWearCluster::update(float dt) {
     m_mouseBounds = m_bounds;
-    updateFakeTelemetry(dt);
+
+    if (m_simulator != nullptr) {
+        const EngineWearState &state = m_simulator->getEngineWearState();
+        if (state.revision != m_cachedRevision) {
+            m_state = state;
+            refreshCachedStrings();
+        }
+    }
+
     UiElement::update(dt);
 }
 
@@ -70,252 +131,195 @@ void EngineWearCluster::render() {
 }
 
 void EngineWearCluster::renderDashboard(const Bounds &bounds) {
-    const float titleSize = std::clamp(bounds.height() * 0.038f, 18.0f, 24.0f);
-    const float sectionSize = std::clamp(bounds.height() * 0.028f, 14.0f, 18.0f);
-    const float bodySize = std::clamp(bounds.height() * 0.024f, 12.0f, 16.0f);
-    const float valueSize = std::clamp(bounds.height() * 0.11f, 42.0f, 72.0f);
-    const float severity = getSeverityIndex();
-    const ysVector severityColor = getSeverityColor(severity);
-    const ysVector panelFill = mix(severityColor, m_app->getBackgroundColor(), 0.92f);
+    if (!m_state.valid) {
+        drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
+        drawAlignedText("NO ENGINE WEAR DATA", bounds, 20.0f, Bounds::center, Bounds::center);
+        return;
+    }
 
-    drawBox(bounds.inset(1.0f), panelFill);
-    drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
+    const float sectionSize = std::clamp(bounds.height() * 0.026f, 13.0f, 18.0f);
+    const float bodySize = std::clamp(bounds.height() * 0.022f, 11.0f, 15.0f);
+    const ysVector fg = m_app->getForegroundColor();
+    const ysVector bg = m_app->getBackgroundColor();
 
-    const Bounds inner = bounds.inset(12.0f);
-    const Bounds headerBounds = inner.verticalSplit(0.92f, 1.0f);
-    const Bounds bodyBounds = inner.verticalSplit(0.0f, 0.9f);
-    const Bounds headerAccent = headerBounds.verticalSplit(0.0f, 0.12f);
+    drawFrame(bounds, 1.0f, fg, bg);
 
-    drawBox(headerAccent, severityColor);
-    drawText("ENGINE WEAR", headerBounds, titleSize, Bounds::tl);
-    drawAlignedText("[J] TOGGLE", headerBounds, bodySize, Bounds::tr, Bounds::tr);
+    const Bounds inner = bounds.inset(10.0f);
+    const Bounds headerBounds = inner.verticalSplit(0.94f, 1.0f);
+    const Bounds bodyBounds = inner.verticalSplit(0.0f, 0.92f);
+    drawText("ENGINE WEAR", headerBounds, sectionSize, Bounds::tl);
+    drawAlignedText("[J]", headerBounds, bodySize, Bounds::tr, Bounds::tr);
 
-    const Bounds topBounds = bodyBounds.verticalSplit(0.46f, 1.0f);
-    const Bounds bottomBounds = bodyBounds.verticalSplit(0.0f, 0.42f);
-    const Bounds healthBounds = topBounds.horizontalSplit(0.0f, 0.38f);
-    const Bounds factorsBounds = topBounds.horizontalSplit(0.4f, 1.0f);
-    const Bounds serviceBounds = bottomBounds.horizontalSplit(0.0f, 0.48f);
-    const Bounds hotspotBounds = bottomBounds.horizontalSplit(0.5f, 1.0f);
-    const Bounds historyBounds = bodyBounds.verticalSplit(0.42f, 0.46f);
+    const Bounds leftColumn = bodyBounds.horizontalSplit(0.0f, 0.36f);
+    const Bounds rightColumn = bodyBounds.horizontalSplit(0.39f, 1.0f);
 
-    drawBox(healthBounds.inset(1.0f), mix(severityColor, m_app->getBackgroundColor(), 0.88f));
-    drawBox(factorsBounds.inset(1.0f), mix(m_app->getBlue(), m_app->getBackgroundColor(), 0.92f));
-    drawBox(serviceBounds.inset(1.0f), mix(m_app->getYellow(), m_app->getBackgroundColor(), 0.94f));
-    drawBox(hotspotBounds.inset(1.0f), mix(m_app->getOrange(), m_app->getBackgroundColor(), 0.92f));
+    const Bounds overviewBounds = leftColumn.verticalSplit(0.42f, 1.0f);
+    const Bounds exposureBounds = leftColumn.verticalSplit(0.0f, 0.39f);
+    const Bounds liveStressBounds = rightColumn.verticalSplit(0.48f, 1.0f);
+    const Bounds damageBounds = rightColumn.verticalSplit(0.0f, 0.45f);
 
-    drawFrame(healthBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
-    drawFrame(factorsBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
-    drawFrame(serviceBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
-    drawFrame(hotspotBounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
+    drawFrame(overviewBounds, 1.0f, fg, mix(getRiskColor(1.0f - m_state.globalHealth), bg, 0.90f));
+    drawFrame(exposureBounds, 1.0f, fg, bg);
+    drawFrame(liveStressBounds, 1.0f, fg, bg);
+    drawFrame(damageBounds, 1.0f, fg, bg);
 
-    const Bounds healthInner = healthBounds.inset(12.0f);
-    const Bounds healthTitle = healthInner.verticalSplit(0.78f, 1.0f);
-    const Bounds healthValue = healthInner.verticalSplit(0.28f, 0.76f);
-    const Bounds healthRate = healthInner.verticalSplit(0.12f, 0.28f);
-    const Bounds healthBar = healthInner.verticalSplit(0.02f, 0.1f);
-    drawText("HEALTH", healthTitle, sectionSize, Bounds::tl);
-    drawStatusBadge(healthTitle.horizontalSplit(0.58f, 1.0f), getConditionLabel(), severity);
-    drawAlignedText(formatValue(m_engineHealth * 100.0f, 0, "%"), healthValue, valueSize, Bounds::center, Bounds::center);
-    drawAlignedText(formatValue(m_wearRatePerMinute, 2, "%/min"), healthRate, bodySize, Bounds::center, Bounds::center);
-    drawFrame(healthBar, 1.0f, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.6f), m_app->getBackgroundColor());
-    drawBox(Bounds(healthBar.width() * m_engineHealth, healthBar.height(), healthBar.getPosition(Bounds::bl), Bounds::bl).inset(1.0f), severityColor);
-
-    const Bounds factorsInner = factorsBounds.inset(12.0f);
-    drawBox(factorsInner.verticalSplit(0.78f, 0.8f), m_app->getBlue());
-    drawText("LOAD", factorsInner.verticalSplit(0.84f, 1.0f), sectionSize, Bounds::tl);
-    Grid factorGrid{ 1, 4 };
-    const Bounds factorRows = factorsInner.verticalSplit(0.0f, 0.8f);
-    drawMetricRow(factorGrid.get(factorRows, 0, 3), "THERMAL", m_thermalStress, m_thermalStress);
-    drawMetricRow(factorGrid.get(factorRows, 0, 2), "OIL", m_lubricationReserve, 1.0f - m_lubricationReserve);
-    drawMetricRow(factorGrid.get(factorRows, 0, 1), "KNOCK", m_knockExposure, m_knockExposure);
-    drawMetricRow(factorGrid.get(factorRows, 0, 0), "BEARING", m_bearingStress, m_bearingStress);
-
-    const Bounds serviceInner = serviceBounds.inset(12.0f);
-    drawBox(serviceInner.verticalSplit(0.74f, 0.76f), m_app->getYellow());
-    drawText("STATUS", serviceInner.verticalSplit(0.8f, 1.0f), sectionSize, Bounds::tl);
-    Grid serviceGrid{ 1, 4 };
-    const Bounds serviceRows = serviceInner.verticalSplit(0.0f, 0.72f);
-    drawText("ALERT", serviceGrid.get(serviceRows, 0, 3), bodySize, Bounds::lm);
-    drawAlignedText(getPrimaryAlert(), serviceGrid.get(serviceRows, 0, 3), bodySize, Bounds::rm, Bounds::rm);
-    drawText("OIL", serviceGrid.get(serviceRows, 0, 2), bodySize, Bounds::lm);
-    drawAlignedText(formatValue(m_oilTemperature, 0, " C"), serviceGrid.get(serviceRows, 0, 2), bodySize, Bounds::rm, Bounds::rm);
-    drawText("COOLANT", serviceGrid.get(serviceRows, 0, 1), bodySize, Bounds::lm);
-    drawAlignedText(formatValue(m_coolantTemperature, 0, " C"), serviceGrid.get(serviceRows, 0, 1), bodySize, Bounds::rm, Bounds::rm);
-    drawText("BLOW-BY", serviceGrid.get(serviceRows, 0, 0), bodySize, Bounds::lm);
-    drawAlignedText(formatValue(m_blowBy * 100.0f, 0, "%"), serviceGrid.get(serviceRows, 0, 0), bodySize, Bounds::rm, Bounds::rm);
-
-    const Bounds hotspotInner = hotspotBounds.inset(12.0f);
-    drawBox(hotspotInner.verticalSplit(0.78f, 0.8f), m_app->getOrange());
-    drawText("HOTSPOTS", hotspotInner.verticalSplit(0.84f, 1.0f), sectionSize, Bounds::tl);
-    Grid hotspotGrid{ 1, 4 };
-    const Bounds hotspotRows = hotspotInner.verticalSplit(0.0f, 0.8f);
-    drawMetricRow(hotspotGrid.get(hotspotRows, 0, 3), "BOTTOM END", m_bearingStress, m_bearingStress);
-    drawMetricRow(hotspotGrid.get(hotspotRows, 0, 2), "RING PACK", m_ringSealLoss, m_ringSealLoss);
-    drawMetricRow(hotspotGrid.get(hotspotRows, 0, 1), "VALVETRAIN", m_valvetrainFatigue, m_valvetrainFatigue);
-    drawMetricRow(hotspotGrid.get(hotspotRows, 0, 0), "COOLING", m_headThermalLoad, m_headThermalLoad);
-
-    drawHistoryChart(historyBounds);
+    renderOverviewPanel(overviewBounds.inset(10.0f));
+    renderExposurePanel(exposureBounds.inset(10.0f));
+    renderLiveStressPanel(liveStressBounds.inset(10.0f));
+    renderDamagePanel(damageBounds.inset(10.0f));
 }
 
 void EngineWearCluster::setSimulator(Simulator *simulator) {
     m_simulator = simulator;
+    m_cachedRevision = 0;
+    m_state = EngineWearState{};
 }
 
-void EngineWearCluster::updateFakeTelemetry(float dt) {
-    m_elapsedTime += dt;
+void EngineWearCluster::refreshCachedStrings() {
+    m_cachedRevision = m_state.revision;
 
-    const float rpmLoad = getRpmLoad();
-    const float throttleLoad = getThrottleLoad();
-    const float dynoBias = (m_simulator != nullptr && m_simulator->m_dyno.m_enabled) ? 0.12f : 0.0f;
-    const float slowPulse = 0.5f + 0.5f * std::sin(m_elapsedTime * 0.35f);
-    const float fastPulse = 0.5f + 0.5f * std::sin(m_elapsedTime * 1.7f);
+    m_healthText = formatPercent(m_state.globalHealth);
+    m_damageRateText = formatRate(m_state.damageRatePerHour);
+    m_rulText = formatHours(m_state.remainingUsefulLifeHours);
+    m_confidenceText = formatPercent(m_state.confidence);
+    m_failureModeText = getFailureModeLabel(m_state.dominantFailureMode);
+    m_oilTemperatureText = formatTemperature(m_state.oilTemperatureC);
+    m_coolantTemperatureText = formatTemperature(m_state.coolantTemperatureC);
 
-    const float thermalTarget = clamp01(0.18f + 0.46f * rpmLoad + 0.28f * throttleLoad + 0.10f * slowPulse + dynoBias);
-    const float lubricationTarget = clamp01(0.92f - 0.38f * rpmLoad - 0.18f * throttleLoad + 0.06f * std::cos(m_elapsedTime * 0.4f));
-    const float knockTarget = clamp01(0.08f + 0.24f * throttleLoad + 0.22f * rpmLoad + 0.12f * fastPulse + dynoBias * 0.5f);
-    const float bearingTarget = clamp01(0.14f + 0.42f * rpmLoad + 0.22f * throttleLoad + dynoBias);
-    const float ringTarget = clamp01(0.08f + thermalTarget * 0.42f + throttleLoad * 0.18f + fastPulse * 0.08f);
-    const float valvetrainTarget = clamp01(0.10f + rpmLoad * 0.54f + slowPulse * 0.06f);
-    const float headTarget = clamp01(0.12f + thermalTarget * 0.62f + throttleLoad * 0.10f);
-    const float blowByTarget = clamp01(0.04f + ringTarget * 0.46f + throttleLoad * 0.10f);
-    const float oilTemperatureTarget = 82.0f + 46.0f * thermalTarget + 4.0f * std::sin(m_elapsedTime * 0.25f);
-    const float coolantTemperatureTarget = 78.0f + 38.0f * headTarget + 3.0f * std::cos(m_elapsedTime * 0.18f);
+    m_thermalMarginText = formatPercent(m_state.thermalMargin);
+    m_lubricationMarginText = formatPercent(m_state.lubricationMargin);
+    m_detonationMarginText = formatPercent(m_state.detonationMargin);
+    m_fatigueLoadText = formatPercent(m_state.mechanicalFatigueLoad);
+    m_combustionStabilityText = formatPercent(m_state.combustionStability);
 
-    m_thermalStress = smoothValue(m_thermalStress, thermalTarget, dt, 2.0f);
-    m_lubricationReserve = smoothValue(m_lubricationReserve, lubricationTarget, dt, 1.8f);
-    m_knockExposure = smoothValue(m_knockExposure, knockTarget, dt, 2.8f);
-    m_bearingStress = smoothValue(m_bearingStress, bearingTarget, dt, 2.2f);
-    m_ringSealLoss = smoothValue(m_ringSealLoss, ringTarget, dt, 2.0f);
-    m_valvetrainFatigue = smoothValue(m_valvetrainFatigue, valvetrainTarget, dt, 1.9f);
-    m_headThermalLoad = smoothValue(m_headThermalLoad, headTarget, dt, 1.7f);
-    m_blowBy = smoothValue(m_blowBy, blowByTarget, dt, 2.4f);
-    m_oilTemperature = smoothValue(m_oilTemperature, oilTemperatureTarget, dt, 1.6f);
-    m_coolantTemperature = smoothValue(m_coolantTemperature, coolantTemperatureTarget, dt, 1.4f);
+    m_bottomEndDamageText = formatPercent(m_state.bottomEndDamage);
+    m_ringSealDamageText = formatPercent(m_state.ringSealDamage);
+    m_valvetrainDamageText = formatPercent(m_state.valvetrainDamage);
+    m_headGasketDamageText = formatPercent(m_state.headGasketDamage);
+    m_lubricationDamageText = formatPercent(m_state.lubricationSystemDamage);
 
-    const float severity = getSeverityIndex();
-    const float wearRateTarget = 0.06f + severity * 1.42f;
-    m_wearRatePerMinute = smoothValue(m_wearRatePerMinute, wearRateTarget, dt, 2.1f);
-    m_engineHealth = clamp01(m_engineHealth - severity * dt * 0.00085f);
-
-    pushHistorySample(severity);
+    m_overRevText = formatDuration(m_state.overRevSeconds);
+    m_overTempText = formatDuration(m_state.overTempSeconds);
+    m_coldLoadText = formatDuration(m_state.coldHighLoadSeconds);
+    m_oilStarvationText = formatDuration(m_state.oilStarvationSeconds);
+    m_knockEventText = formatCount(m_state.severeKnockEvents);
+    m_thermalCyclesText = formatCount(m_state.thermalCycles);
 }
 
 void EngineWearCluster::renderSummary(const Bounds &bounds) {
-    drawBox(bounds.inset(1.0f), mix(getSeverityColor(getSeverityIndex()), m_app->getBackgroundColor(), 0.92f));
     drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
-    const Bounds inner = bounds.inset(12.0f);
-    const Bounds title = inner.verticalSplit(0.76f, 1.0f);
-    const Bounds body = inner.verticalSplit(0.0f, 0.74f);
+    const Bounds inner = bounds.inset(10.0f);
+    drawText("WEAR", inner.verticalSplit(0.80f, 1.0f), 18.0f, Bounds::tl);
+    drawAlignedText("[J]", inner.verticalSplit(0.80f, 1.0f), 14.0f, Bounds::tr, Bounds::tr);
 
-    drawText("WEAR", title, 20.0f, Bounds::tl);
-    drawAlignedText("[J]", title, 14.0f, Bounds::tr, Bounds::tr);
+    if (!m_state.valid) {
+        drawAlignedText("NO DATA", inner.verticalSplit(0.36f, 0.70f), 24.0f, Bounds::center, Bounds::center);
+        return;
+    }
 
-    const Bounds healthBounds = body.verticalSplit(0.54f, 1.0f);
-    Bounds healthStatusBounds = healthBounds;
-    healthStatusBounds.move({ 0.0f, -32.0f });
-    drawAlignedText(formatValue(m_engineHealth * 100.0f, 0, "%"), healthBounds, 52.0f, Bounds::tm, Bounds::tm);
-    drawAlignedText(getConditionLabel(), healthStatusBounds, 18.0f, Bounds::bm, Bounds::bm);
+    drawAlignedText(m_healthText, inner.verticalSplit(0.50f, 0.78f), 40.0f, Bounds::center, Bounds::center);
+    drawAlignedText(m_damageRateText, inner.verticalSplit(0.32f, 0.44f), 14.0f, Bounds::center, Bounds::center);
+    drawText(m_failureModeText, inner.verticalSplit(0.18f, 0.28f), 13.0f, Bounds::lm);
 
-    const Bounds severityBounds = body.verticalSplit(0.38f, 0.5f);
-    drawFrame(severityBounds, 1.0f, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.55f), m_app->getBackgroundColor());
+    const Bounds barBounds = inner.verticalSplit(0.06f, 0.16f);
+    drawBox(barBounds, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.88f));
     drawBox(
-        Bounds(severityBounds.width() * getSeverityIndex(), severityBounds.height(), severityBounds.getPosition(Bounds::bl), Bounds::bl).inset(1.0f),
-        getSeverityColor(getSeverityIndex()));
-    drawText("SEVERITY", severityBounds.inset(4.0f).move({ 0.0f, 10.0f }), 13.0f, Bounds::tl);
-    drawAlignedText(formatValue(m_wearRatePerMinute, 2, "%/min"), severityBounds.inset(4.0f), 14.0f, Bounds::br, Bounds::br);
+        Bounds(barBounds.width() * m_state.globalHealth, barBounds.height(), barBounds.getPosition(Bounds::bl), Bounds::bl),
+        getRiskColor(1.0f - m_state.globalHealth));
+}
 
-    Grid metricGrid{ 1, 3 };
-    const Bounds metricsBounds = body.verticalSplit(0.0f, 0.32f);
-    drawMetricRow(metricGrid.get(metricsBounds, 0, 2), "THERMAL", m_thermalStress, m_thermalStress);
-    drawMetricRow(metricGrid.get(metricsBounds, 0, 1), "OIL", m_lubricationReserve, 1.0f - m_lubricationReserve);
-    drawMetricRow(metricGrid.get(metricsBounds, 0, 0), "KNOCK", m_knockExposure, m_knockExposure);
+void EngineWearCluster::renderOverviewPanel(const Bounds &bounds) {
+    const float titleSize = std::clamp(bounds.height() * 0.10f, 14.0f, 18.0f);
+    const float bodySize = std::clamp(bounds.height() * 0.07f, 11.0f, 15.0f);
+    const float valueSize = std::clamp(bounds.height() * 0.20f, 34.0f, 54.0f);
+
+    drawText("OVERVIEW", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+    drawAlignedText(m_confidenceText, bounds.verticalSplit(0.90f, 1.0f), bodySize, Bounds::tr, Bounds::tr);
+    drawAlignedText(m_healthText, bounds.verticalSplit(0.56f, 0.86f), valueSize, Bounds::center, Bounds::center);
+    drawAlignedText(m_failureModeText, bounds.verticalSplit(0.46f, 0.54f), bodySize, Bounds::center, Bounds::center);
+
+    Grid infoGrid{ 1, 4 };
+    const Bounds infoRows = bounds.verticalSplit(0.0f, 0.42f);
+    drawInfoRow(infoGrid.get(infoRows, 0, 3), "RATE", m_damageRateText, bodySize);
+    drawInfoRow(infoGrid.get(infoRows, 0, 2), "RUL", m_rulText, bodySize);
+    drawInfoRow(infoGrid.get(infoRows, 0, 1), "OIL", m_oilTemperatureText, bodySize);
+    drawInfoRow(infoGrid.get(infoRows, 0, 0), "COOLANT", m_coolantTemperatureText, bodySize);
+}
+
+void EngineWearCluster::renderExposurePanel(const Bounds &bounds) {
+    const float titleSize = std::clamp(bounds.height() * 0.12f, 14.0f, 18.0f);
+    const float bodySize = std::clamp(bounds.height() * 0.10f, 11.0f, 15.0f);
+
+    drawText("EXPOSURE", bounds.verticalSplit(0.88f, 1.0f), titleSize, Bounds::tl);
+
+    Grid infoGrid{ 1, 6 };
+    const Bounds rows = bounds.verticalSplit(0.0f, 0.82f);
+    drawInfoRow(infoGrid.get(rows, 0, 5), "OVERREV", m_overRevText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 4), "OVERTEMP", m_overTempText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 3), "COLD LOAD", m_coldLoadText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 2), "OIL STARVE", m_oilStarvationText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 1), "KNOCK EV", m_knockEventText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 0), "HEAT CYC", m_thermalCyclesText, bodySize);
+}
+
+void EngineWearCluster::renderLiveStressPanel(const Bounds &bounds) {
+    const float titleSize = std::clamp(bounds.height() * 0.08f, 14.0f, 18.0f);
+    drawText("LIVE STRESS", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+
+    Grid metricGrid{ 1, 5 };
+    const Bounds rows = bounds.verticalSplit(0.0f, 0.84f);
+    drawMetricRow(metricGrid.get(rows, 0, 4), "THERMAL", m_thermalMarginText, m_state.thermalMargin, 1.0f - m_state.thermalMargin);
+    drawMetricRow(metricGrid.get(rows, 0, 3), "LUBE", m_lubricationMarginText, m_state.lubricationMargin, 1.0f - m_state.lubricationMargin);
+    drawMetricRow(metricGrid.get(rows, 0, 2), "DET MARGIN", m_detonationMarginText, m_state.detonationMargin, 1.0f - m_state.detonationMargin);
+    drawMetricRow(metricGrid.get(rows, 0, 1), "FATIGUE", m_fatigueLoadText, m_state.mechanicalFatigueLoad, m_state.mechanicalFatigueLoad);
+    drawMetricRow(metricGrid.get(rows, 0, 0), "STABILITY", m_combustionStabilityText, m_state.combustionStability, 1.0f - m_state.combustionStability);
+}
+
+void EngineWearCluster::renderDamagePanel(const Bounds &bounds) {
+    const float titleSize = std::clamp(bounds.height() * 0.08f, 14.0f, 18.0f);
+    drawText("DAMAGE BREAKDOWN", bounds.verticalSplit(0.90f, 1.0f), titleSize, Bounds::tl);
+
+    Grid metricGrid{ 1, 5 };
+    const Bounds rows = bounds.verticalSplit(0.0f, 0.84f);
+    drawMetricRow(metricGrid.get(rows, 0, 4), "BOTTOM END", m_bottomEndDamageText, m_state.bottomEndDamage, m_state.bottomEndDamage);
+    drawMetricRow(metricGrid.get(rows, 0, 3), "RING SEAL", m_ringSealDamageText, m_state.ringSealDamage, m_state.ringSealDamage);
+    drawMetricRow(metricGrid.get(rows, 0, 2), "VALVETRAIN", m_valvetrainDamageText, m_state.valvetrainDamage, m_state.valvetrainDamage);
+    drawMetricRow(metricGrid.get(rows, 0, 1), "HEAD/GASKET", m_headGasketDamageText, m_state.headGasketDamage, m_state.headGasketDamage);
+    drawMetricRow(metricGrid.get(rows, 0, 0), "LUBE SYS", m_lubricationDamageText, m_state.lubricationSystemDamage, m_state.lubricationSystemDamage);
 }
 
 void EngineWearCluster::drawMetricRow(
     const Bounds &bounds,
     const std::string &label,
-    float displayValue,
-    float severity)
+    const std::string &valueText,
+    float displayRatio,
+    float risk)
 {
     const Bounds row = bounds.inset(2.0f);
-    const Bounds labelBounds = row.horizontalSplit(0.0f, 0.28f);
-    const Bounds valueBounds = row.horizontalSplit(0.84f, 1.0f);
-    const Bounds barBounds = row.horizontalSplit(0.3f, 0.82f).verticalSplit(0.18f, 0.82f);
-    const ysVector barColor = getSeverityColor(severity);
-    const ysVector frameColor = mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.6f);
-    const float textSize = std::clamp(row.height() * 0.42f, 11.0f, 16.0f);
+    const Bounds barBounds = row.horizontalSplit(0.32f, 0.82f).verticalSplit(0.22f, 0.72f);
+    const float textSize = std::clamp(row.height() * 0.42f, 11.0f, 15.0f);
 
-    drawText(label, labelBounds, textSize, Bounds::lm);
-    drawAlignedText(formatValue(displayValue * 100.0f, 0, "%"), valueBounds, textSize, Bounds::rm, Bounds::rm);
-    drawFrame(barBounds, 1.0f, frameColor, m_app->getBackgroundColor());
+    drawText(label, row.horizontalSplit(0.0f, 0.30f), textSize, Bounds::lm);
+    drawAlignedText(valueText, row.horizontalSplit(0.84f, 1.0f), textSize, Bounds::rm, Bounds::rm);
+    drawBox(barBounds, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.88f));
     drawBox(
-        Bounds(barBounds.width() * clamp01(displayValue), barBounds.height(), barBounds.getPosition(Bounds::bl), Bounds::bl).inset(1.0f),
-        barColor);
+        Bounds(barBounds.width() * clamp01(displayRatio), barBounds.height(), barBounds.getPosition(Bounds::bl), Bounds::bl),
+        getRiskColor(risk));
 }
 
-void EngineWearCluster::drawHistoryChart(const Bounds &bounds) {
-    drawBox(bounds.inset(1.0f), mix(m_app->getBlue(), m_app->getBackgroundColor(), 0.95f));
-    drawFrame(bounds, 1.0f, mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.55f), m_app->getBackgroundColor());
-
-    const Bounds inner = bounds.inset(6.0f);
-    const int sampleCount = std::max(m_historyCount, 1);
-    const float slotWidth = inner.width() / sampleCount;
-
-    for (int i = 0; i < sampleCount; ++i) {
-        const int historyIndex = (m_historyWriteIndex - sampleCount + i + HistorySamples) % HistorySamples;
-        const float sample = clamp01(m_severityHistory[historyIndex]);
-        const float width = std::max(slotWidth - 2.0f, 1.0f);
-        const float height = std::max(sample * inner.height(), 2.0f);
-        const float x = inner.left() + i * slotWidth;
-        drawBox(Bounds(width, height, { x, inner.bottom() }, Bounds::bl), getSeverityColor(sample));
-    }
-
-    drawText("TREND", inner, 14.0f, Bounds::tl);
+void EngineWearCluster::drawInfoRow(
+    const Bounds &bounds,
+    const std::string &label,
+    const std::string &valueText,
+    float textSize)
+{
+    drawText(label, bounds, textSize, Bounds::lm);
+    drawAlignedText(valueText, bounds, textSize, Bounds::rm, Bounds::rm);
 }
 
-void EngineWearCluster::drawStatusBadge(const Bounds &bounds, const std::string &label, float severity) {
-    const Bounds badgeBounds = bounds.verticalSplit(0.2f, 0.78f);
-    drawBox(badgeBounds, mix(getSeverityColor(severity), m_app->getBackgroundColor(), 0.25f));
-    drawFrame(badgeBounds, 1.0f, getSeverityColor(severity), m_app->getBackgroundColor(), false);
-    drawAlignedText(label, badgeBounds, 16.0f, Bounds::center, Bounds::center);
-}
-
-void EngineWearCluster::pushHistorySample(float sample) {
-    m_severityHistory[m_historyWriteIndex] = sample;
-    m_historyWriteIndex = (m_historyWriteIndex + 1) % HistorySamples;
-    m_historyCount = std::min(m_historyCount + 1, HistorySamples);
-}
-
-float EngineWearCluster::getRpmLoad() const {
-    if (m_simulator == nullptr || m_simulator->getEngine() == nullptr) {
-        return 0.25f;
-    }
-
-    const double redline = std::max(m_simulator->getEngine()->getRedline(), units::rpm(1000));
-    return clamp01(static_cast<float>(std::abs(m_simulator->getEngine()->getRpm()) / redline));
-}
-
-float EngineWearCluster::getThrottleLoad() const {
-    if (m_simulator == nullptr || m_simulator->getEngine() == nullptr) {
-        return 0.3f;
-    }
-
-    return clamp01(static_cast<float>(m_simulator->getEngine()->getThrottle()));
-}
-
-float EngineWearCluster::getSeverityIndex() const {
-    return clamp01(
-        0.28f * m_thermalStress
-        + 0.22f * (1.0f - m_lubricationReserve)
-        + 0.18f * m_knockExposure
-        + 0.14f * m_bearingStress
-        + 0.10f * m_ringSealLoss
-        + 0.08f * m_valvetrainFatigue);
-}
-
-ysVector EngineWearCluster::getSeverityColor(float value) const {
-    const float clamped = clamp01(value);
+ysVector EngineWearCluster::getRiskColor(float risk) const {
+    const float clamped = clamp01(risk);
     if (clamped < 0.33f) {
         return mix(m_app->getGreen(), m_app->getYellow(), clamped / 0.33f);
     }
@@ -326,40 +330,25 @@ ysVector EngineWearCluster::getSeverityColor(float value) const {
     return mix(m_app->getOrange(), m_app->getRed(), (clamped - 0.66f) / 0.34f);
 }
 
-std::string EngineWearCluster::getConditionLabel() const {
-    if (m_engineHealth > 0.78f) {
-        return "STABLE";
-    }
-    else if (m_engineHealth > 0.6f) {
-        return "WATCH";
-    }
-    else if (m_engineHealth > 0.4f) {
-        return "AT RISK";
-    }
-
-    return "CRITICAL";
-}
-
-std::string EngineWearCluster::getPrimaryAlert() const {
-    const float hotspots[] = {
-        m_bearingStress,
-        m_ringSealLoss,
-        m_valvetrainFatigue,
-        m_headThermalLoad
-    };
-    const char *labels[] = {
-        "bottom-end fatigue",
-        "ring seal erosion",
-        "valvetrain loading",
-        "head heat soak"
-    };
-
-    int maxIndex = 0;
-    for (int i = 1; i < 4; ++i) {
-        if (hotspots[i] > hotspots[maxIndex]) {
-            maxIndex = i;
-        }
+const char *EngineWearCluster::getFailureModeLabel(EngineWearState::FailureMode mode) const {
+    switch (mode) {
+    case EngineWearState::FailureMode::Balanced:
+        return "balanced";
+    case EngineWearState::FailureMode::ThermalOverload:
+        return "thermal overload";
+    case EngineWearState::FailureMode::LubricationBreakdown:
+        return "lubrication breakdown";
+    case EngineWearState::FailureMode::DetonationDamage:
+        return "detonation damage";
+    case EngineWearState::FailureMode::BottomEndFatigue:
+        return "bottom-end fatigue";
+    case EngineWearState::FailureMode::RingSealWear:
+        return "ring seal wear";
+    case EngineWearState::FailureMode::ValvetrainFatigue:
+        return "valvetrain fatigue";
+    case EngineWearState::FailureMode::HeadGasketRisk:
+        return "head gasket risk";
     }
 
-    return labels[maxIndex];
+    return "balanced";
 }
