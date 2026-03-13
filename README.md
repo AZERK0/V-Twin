@@ -1,72 +1,97 @@
-# Engine Simulator
-![Alt text](docs/public/screenshots/screenshot_v01.png?raw=true)
----
-## **Warning: project is in development and will change frequently**
----
+# V-Twin
 
-## What is this?
+![V-Twin screenshot](docs/public/screenshots/screenshot_v01.png?raw=true)
 
-This is a real-time internal combustion engine simulation **designed specifically to produce engine audio and simulate engine response characteristics.** It is NOT a scientific tool and cannot be expected to provide accurate figures for the purposes of engineering or engine tuning.
+V-Twin is a fork of Engine Simulator focused on real-time engine analysis, audio, and diagnostics. In this fork, the engine wear dashboard is a core part of the project: it turns live simulation signals into durability indicators, exposure metrics, and failure-mode oriented feedback.
 
-## How do I install it?
+## What V-Twin is for
 
-This is a code repository and might not look like other software that you're used to downloading and installing (if you're not familiar with programming). To download a ready-to-use version of the application, navigate to the [releases page](https://github.com/ange-yaghi/engine-sim/releases), find the most recent release (ex. `v0.1.5a`), click "Assets" and download the .zip file with a name that starts with `engine-sim-build`. Unzip this file, then run `bin/engine-sim-app.exe`. The simulator should then start normally.
+- simulating internal combustion engines in real time
+- producing engine audio and response behavior
+- exploring operating stress, damage accumulation, and wear diagnostics
+- building UI and tooling around engine health visualization
 
-Check out [our Frequently Asked Questions](https://github.com/ange-yaghi/engine-sim/wiki/Frequently-Asked-Questions) if you need more details.
+V-Twin is still a simulator, not a certified engineering tool. The wear model is intentionally designed as a meaningful diagnostic layer, but it remains a simulated model rather than a validated real-world measurement system.
 
-## How do I use it?
+## Engine wear mode
 
-The UI is extremely minimalistic and there are only a few controls used to interact with the engine:
+Engine wear mode is now at the center of the project.
+
+It introduces:
+
+- a wear model that derives health and durability metrics from live simulator state
+- a published snapshot consumed by the UI without mixing rendering and simulation logic
+- a dedicated dashboard for health, reserves, stress, accumulated damage, and exposure history
+- a dominant failure mode view to guide inspection and interpretation
+
+Key metrics exposed by the wear dashboard include:
+
+- global health
+- thermal reserve
+- lubrication reserve
+- detonation reserve
+- remaining useful life
+- damage rate
+- accumulated subsystem damage
+- over-rev, over-temp, cold-load, starvation, and knock events
+
+See `ENGINE_WEAR_METRICS.md` for a detailed description of the current model and every displayed metric.
+
+## Controls
+
+The simulator keeps the original keyboard-driven workflow, with an added shortcut for the wear HUD.
 
 | Key/Input | Action |
-| :---: | :---: |
-| A | Toggle ignition |
-| S | Hold for starter |
-| D | Enable dyno |
-| H | Enable RPM hold (see below for instructions) |
-| G + Scroll | Change hold speed |
-| F | Enter fullscreen mode |
-| I | Display dyno stats in the information panel |
-| Shift | Clutch (hold spacebar at the same time to slowly engage/disengage) |
-| Up Arrow | Up Gear | 
-| Down Arrow | Down Gear | 
-| Z + Scroll | Volume |
-| X + Scroll | Convolution Level |
-| C + Scroll | High frequency gain |
-| V + Scroll | Low frequency noise |
-| B + Scroll | High frequency noise |
-| N + Scroll | Simulation frequency |
-| M | Increase view layer |
-| , | Decrease view layer |
-| Enter | Reload engine script |
-| Escape | Exit the program |
-| Q, W, E, R | Change throttle position |
-| Space + Scroll | Fine throttle adjustment |
-| 1, 2, 3, 4, 5 | Simulation time warp |
-| Tab | Change screen |
+| :---: | :--- |
+| `A` | Toggle ignition |
+| `S` | Hold for starter |
+| `D` | Enable dyno |
+| `H` | Enable RPM hold |
+| `G` + scroll | Change hold speed |
+| `F` | Toggle fullscreen |
+| `I` | Display dyno stats in the information panel |
+| `J` | Toggle engine wear HUD |
+| `Shift` | Clutch |
+| `Space` + scroll | Fine throttle adjustment |
+| `Up Arrow` | Up gear |
+| `Down Arrow` | Down gear |
+| `Q`, `W`, `E`, `R` | Change throttle position |
+| `Z` + scroll | Volume |
+| `X` + scroll | Convolution level |
+| `C` + scroll | High-frequency gain |
+| `V` + scroll | Low-frequency noise |
+| `B` + scroll | High-frequency noise |
+| `N` + scroll | Simulation frequency |
+| `M` | Increase view layer |
+| `,` | Decrease view layer |
+| `Enter` | Reload engine script |
+| `Tab` | Change screen |
+| `Escape` | Exit |
 
-### Using the RPM hold
-The RPM hold feature will hold the engine at a specific RPM and also measure the engine's horsepower and torque at that RPM. You can enable RPM hold by pressing the `H` key. **You must then enable the dynomometer** (press the `D` key) in order for the RPM hold to take effect. To change the hold speed, hold the `G` key and scroll with the mouse wheel. The RPM hold will be shown on the `DYNO. SPEED` gauge in the lower left of the screen.
+### RPM hold
 
-## Why is the code so sloppy?
+Press `H` to arm RPM hold, then enable the dyno with `D`. While hold is active, use `G` + scroll to change the target speed.
 
-I wrote this to demo in a [YouTube video](https://youtu.be/RKT-sKtR970), not as a real product. If you would like it to become a usable product please reach out to me or join my Discord (link can be found in the description of the aforementioned YouTube video). I use this codebase for my own purposes and so it might change frequently and without warning.
+## Linux build
 
-## How do I build it? (Ignore this section if you're not a developer!)
+This fork includes a Linux workflow with helper scripts, a `Makefile`, and CMake presets.
 
-### Linux quickstart (recommended)
+### Requirements
 
-The repository now includes an automated Linux workflow with scripts, Make recipes, and CMake presets.
+Install the following with your distribution package manager:
 
-Install dependencies with your distro package manager:
+- `git`
+- `cmake`
+- `pkg-config`
+- `boost`
+- `flex`
+- `bison`
+- `SDL2`
+- `SDL2_image`
 
-1. SDL2
-2. SDL2_image
-3. Boost
-4. Flex and Bison
-5. CMake
+### Quickstart
 
-From the project root:
+From the repository root:
 
 ```bash
 make bootstrap
@@ -75,14 +100,23 @@ make build
 make run
 ```
 
-Useful shortcuts:
+### Equivalent script-based workflow
 
 ```bash
-make build-debug   # configure + build debug preset
-make test          # bootstrap + configure + build + ctest
+./scripts/bootstrap-linux.sh
+./scripts/configure.sh linux-release
+./scripts/build.sh build-release
+./scripts/run.sh
 ```
 
-Direct preset-based commands are also available:
+### Useful commands
+
+```bash
+make build-debug
+make test
+```
+
+Or directly with presets:
 
 ```bash
 cmake --preset linux-release
@@ -90,158 +124,71 @@ cmake --build --preset build-release
 ctest --preset test-release
 ```
 
-### Windows
+### Build outputs
 
-Windows build support is still available through CMake/Visual Studio. The Linux automation does not remove the existing Windows path.
+- release binary: `build/linux-release/engine-sim-app`
+- debug binary: `build/linux-debug/engine-sim-app`
 
-## Patreon Supporters
+The Linux scripts also prepare the runtime `delta.conf` files and run the simulator with `ENGINE_SIM_DATA_ROOT` set correctly.
 
-This project was made possible by the generous donations of the following individuals!
+## Python launcher GUI
 
-### Grease Monkeys
+An optional Python launcher GUI can be used to select an engine and start the simulator more easily when `launcher_python/` is available in your checkout.
 
-|<!-- -->|<!-- -->|<!-- -->|<!-- -->|<!-- -->|
-|-|-|-|-|-|
-|Devin@Hondatuningsuite|nut|Devin C Martinez|WelcomeCat|Saints Sasha|
-|Ida 8858|Emily|Steelorse |Kruddy|Sgt. Fluff|
-|darcuter|FatFluffyFox|Benton1234|Jim C K Flaten|The Zuck|
-|Blade Skydancer|Ye' old apple|Hayden Henderson|AlphaX|Lucas Martins Bündchen|
-|Jay Dog|damo|IBS-IS-CRAP|Snowy|Noah Greenberg|
-|Eisberg|Brendan M.|Alex Layton|Lukas Bartee|Thibaut Dubuisson|
-|The Cheeze Ity|JoeJimTom|MichaelB450|Björn|Bartdavy|
-|sasha bandelier|Caleb Black|COOKIES|Andrew Cooper|asimo3089|
-|Vim Wizard|Kevin Arsenault|Carl Linden|Kele Tappi|Kroklethon|
-|labourateur|viperfan7|SlimmyJimmy|Jason Becker|Sascha Kamp|
-|ves|Supernalboot |BeamNG|Paul Harrison|Tyler Russell (Nytelife26)|
-|nicholas jacobs|DrDotMadness|AVeryPlainTyler|Zach Perez|Paul Schaefer|
-|Clay Bauer|CR33DYM0N14|julien nadeau|Patt313|Philip Edwards|
-|RegularRuby670|Mateusz Ładosz|FémLol Stúdió|Crazy Yany|Elden|
-|Tristan Walker|Matthew McDonald|Jan-Sander Huiting|Mitchell Almstedt|Dylan Lebiedz|
-|Name Here|LoganBoi FNAF|Epic Randomness|MrPiThon|mike |
-|dung|Alvaro ArroyoZamora|Skinna Godwin|BeppoBarone|レナVA|
-|Sabata |Brady Fulham|Powerpuncher |NK10K|Gavin Osowski|
-|Orbitstrider|Steven Doyle|Jaksu2696|Toni |Devin Abolins|
-### Tuners
+### Run the launcher
 
-|<!-- -->|<!-- -->|<!-- -->|<!-- -->|<!-- -->|
-|-|-|-|-|-|
-|Boosted Media|Matthew McLennan|Venican|Lyan le Golmuth|Alberto R.|
-|BetaToaster|Akira Takemoto|J Anderson|Apolly007|LexLuther|
-|xilophor|Robert K|viktor lind|Adrian Kucinski|sarowie .|
-|Chris Fischer|Marlod|Chase Hansen|Aidan Szalanski|Andrew Taylor|
-|Jason Hwang|Juuso Natunen|Ian Moss|PickleRick |Beljim46|
-|RSOFT92|UCD|Sped|OldManJenkins|James Hart|
-|Kalle Nilsson|XxBrasta455xX |Colin Sandage|Dakota Mackinnon|Carter Kopp|
-|Jakub Kozak|CJ Plessas|Loizeau|Charles Mills|YellowLight|
-|Didrik Esbjug|Alessandro Dal Pino|Carter Williams|Robert D|Cadence Plume|
-|BLANK|Provenance EMU|Dylan Engler|Nathan Rojas|Cornelius|
-|Acid|larsloveslegos|Maxime Desages|GM|BreadForMen|
-|Devin Freeman|Lieven RYCKEBOER|Amelia Taylor|Jelle Plukker|sodmo |
-|Jimmy Briscoe|Cirithor|Martin .K|DMartland|Lucas Diem|
-|Richard Budíček|Jack Sheppeard|Meemen|Anderson Huynh|NPException|
-|Mattia Villa|C|AIDAN POWELL|Brenn_the_Otter|Lane Mosier|
-|Ceze |oranjest1|Jw|ISON |Mathew Graham|
-|MACHINA|John Crowell|Asher Blythe|Cronos Skies|Matt Amott|
-|CpTKugelHagel|Simon Krayer|Caleb Bek|Monster Man25|GeneralMoineau|
-|EsuKurimu|Caleb Sartin|Jared L.|Hunter Wood|Ben Poole|
-|Steven Victoria|Jordan Zondlak|Agelessgod|Christopher Fahs|Jonathan Vincent|
-|Dalton Guillot|Simon Stojanovic|Andrew Urbanczyk|deniaL|Tyler Hughes|
-|vPam |Justin Kruithof|Curtis C Coomber|Sawyer Clark|Mike Hart|
-|Ciro Rancourt|Miles Guo|Rewind |E=mc^2|Keaton Call|
-|J.Es|Jeremy B|Chance Hall|Jack Tompkins|Race Sim Studio|
-|Quentin ZAOUI|Floyd Henderson|James Haylow|Milkshiekh |Wyatt Todd|
-|User 2820|Leon Schutte|CYBERBUG_JR|sebiii|Keegan|
-|Victor Cosiuga|Rolly !|Elias Pettersson|Tyson Makovec|Bill McDermott|
-|Phontonic|Simon Armstrong|avec |KidozyGAME (Dead)|Stephan Cote|
-|Justin Biggerstaff|Jabba Jubba|notD34THNIGHT|Inventor|Wesley Bear|
-|Supersonic2510|Pixel|Simon Bernhardt|Bas Vangermeersch|ToyotaCipra|
-|kyle crawford|ApatheticWood|Ben Vaughn|Erich Westhoven|Zack Myers|
-|Tbjoern|Vetle Høgås|Derek Thom|Aaron Beck||
-### Junior Mechanics
+```bash
+python3 launcher_python/main.py
+```
 
-|<!-- -->|<!-- -->|<!-- -->|<!-- -->|<!-- -->|
-|-|-|-|-|-|
-|Karol Szép|Leon Jordan|Nathan Higginson|Patrick F|Samuel Picard|
-|Alexander Fritsch|Lucas Scarpi|Jack Humbert|G2Eneko|SweCreations|
-|Marius Becker|Cedric Wille|infernap12 |Julian Dinges|Wamuthas|
-|Alex Mason|Hawar Karem|Melonenstrauch|Jacek Dębski|Alex Eastman|
-|Darren Taing|Po Wang|Giorgio Iannucci|Levis|Eden|
-|Alin Chiparatu|Arjun Mandakath|A.M. |Dylan Ryan|Noah Entrekin|
-|GT130|Josh D|generic|Henrik Cohrs|Nic Yetter|
-|Dan Fredriksen|153AN1MJ|Rasmus|EpicEcho|Kaur Hendrikson|
-|Maddox Partridge|L33TIFY_|Zack Fletcher|teiiio|Mike Zaite|
-|Evan Sonin|Christopher Zimmerman|PrefacedVase |funtomr|Triton Alabaster|
-|appelpie|Julien Ferluc|AnomalousFerret_|Miles Orozco|Spencer Teeter|
-|ThatCanadian|Harry Prabowo|Dylan Rogerson|Jaedyn Allen|Zephyr Sefira|
-|Alexander Stone|Mason Little|Wojciech Czop|ryzen5 |Kosta Diamantis|
-|Karol Stodolak|Tim van der Linde|Loïc Ruttner|jonthefuzz|AsgarK|
-|James Morgan|Elijah |1ntl|Tobias Johansson|Mome |
-|P|SOPA_|Shingekuro|Sean King|Russell Marsh|
-|Alyx Ranas|Naters305 |ChrisakaMrXD |Nic |sean|
-|Zach Hagedorn|Jhon lenon|Everett Butts|Kyan|ranger Nation|
-|Hiago Oliveira|Texi|MrRhody|Inglorious Bastard|Marty Mitchell|
-|Justin Chao|ManuelS|Cornelius Rössing|Pedro Freire|Anthony Stuart|
-|Hubba Nubba|Skychii|Joe Underwood|Xander_|Notbigdank|
-|Sander D.|Lars Joosten|Danksa|Metrostation |Myles Wommack|
-|Derrick Sampson|Corey Hannen|Matteo La Corte|Octothorp Obelus|David Baril|
-|Soyuz Kafire|Ivan Coha|BigElbowski|Apolepth|Julian Krad|
-|David Soulieres|Eric Huang|Léo Vias|Riccardo Mariani|Vic Viper|
-|Shinkaaaa|Mumaransa |Michael Banovsky|Hendrik Voss|Inverted Blackhat|
-|skipyC |Tobias Moor|jaky3 .|Clément LEGRAND|Ian C. Simpson|
-|Challier|Jan Przemysław Drabik|Dsand23|Smooth DLX|The German Dude|
-|CrazyEagle |Jordon Goodman|HenryWithaG .|Oscar Krula|Brayden Moore|
-|Steven|Nall Wolfert|papajonk|Andrew|Ben Kingston|
-|Julian Vogl|Maxime Lubrano|MrMekouil|Doudimme|Jacob Hultberg|
-|Nolan Orloff|Mike|tobi9899 |Danila Frolkin|Xecotcovach|
-|Aj|Carcar404|John Martin|Dominik Greinert|Lukas Stadler|
-|Oliver Yang|sonax51|Marcel Kliment|Chris|David Rush|
-|LethalVenom13|Dave Osterhoff|Anto1709|Ben|Morgan Munroe|
-|Ivor Forrest|Sam Hopkins|Atte |Dax |William Bergström|
-|homelessmeme|Thanleft|Zaxerg |Robeloox|Maximilian-Lukas Marz|
-|Morgn|Seth Monteleone|playfulmean videos|Lanimations LA|Bram G|
-|Benoit Fournier|Bernar Lepiller|Nicolas Baur|the |Snekers|
-|Darkmount|Tobiasz Michalik|Aidas Ri|Daniel Postler|Skim_Beeblez|
-|Impetus|Thunderbird324|Fred Joss|Krzysztof Radowski|Azerrty|
-|Harrison Speck|Matt Baker|BigLynch|Markus Pelto|IMBIBE|
-|James L Plummer|Rose Giles|Jonas Brekka|HASTRX|Lepoucehumain|
-|Naomi Humin|qkrrudgks|Johann Gross|Janis Knappich|WhatTheDuck|
-|테루|Glimple Bort|Jacob Tudisco|Tanner|Julian kaspi|
-|nathan gould|Randal Rainis Kruus|Beppierre|Craig Martin|Thomas Bukovsky|
-|Colaxe|Robert Oram|Matsuy15 L|Kacpe|Alex Sedlic|
-|Mark Benson|Mhenn!|Anders Nelson|Dingus|Rustle|
-|Marco Schulz|stratum |brochier gabriel|Thomas|brody of hillcountry|
-|Thomas Afford|Brody Blaskie|Martien Gaming|Adrien MC|William A Grubbs|
-|Trevo Ph.D.|Donovan Gibson|Polish R3t4rd|Keith Price|LAWL CAKE|
-|Rhien Schultz|FireThrow13|Seraphim|Titus Standing|Matt Miklos|
-|B Dub|Jonathan Ekman|Al Pomeroy|Vestii|Wil|
-|adrian|Airatise|TJ Sinkoski|Shotts SilverStone|Reagan Carbaugh|
-|WarAestheticsRebooted|Aidan Case|Casey Bryant Goodwin|Konrad|Adam Larcher|
-|Kazar Xin Xiao|Riccardo Marcaccio|William S.|Francis Filion|Loïc |
-|Kenny Deane|Blackspots|mike |MXT|Joshua Gibson|
-|milky boi|Hagen|gunmaster929 |jgvan |Benny 282|
-|Sean Wehner|Christian Poole|Ethan|Tsukiyama Shuu|Ooof_uhhh_haah|
-|sano ken ch|Diego Martinez|Chuck|GalaxyFrogs|TheGeForce |
-|Chriphost|Carthage|Greg L|Chipskate|Muhammed Mehmood|
-|Hamilton Sjoberg|Amina Moh|vSiiFT|Jeremy Wren|Esteban Acosta|
-|John A Ullenberg|Michael Morozov|Andrew Webberley|Nathaniel Lim|Aaron Ksicinski|
-|Apocalypt|Josh batuzich|Ed|Hunter |Gene Brockoff|
-|Redheadspellslinger.|Pablo Magariños|Nilz|Jose Manuel Silva Calvo|AJ|
-|Ethan Wille |Aurora|Derek Shunia|Jan|Nope Mircea|
-|Giancarlo Cestari|Tanner Edge|brad.|Connor Merrick|Martin Scholer|
-|Deppy|Dan Smith|Tyson |Jac Comeau|Itemfinder |
-|Tischer Games|Pedro Henrique|BeenWashedUp|martin wolff|Kurt Houben|
-|Thomas Onslow|Brendan Puglisi|Kai Anquetil|Rudolph Ignatenko|CloudHackIX|
-|Zach Carreau|Jonathan Vanderlyn|Krobivnov|ienergy|Leifster|
-|Mikael Kaaronen|Glen|H.Helsing|ange|The Nobles|
-|Johnathan Johnson|Juha Merentie|Jim Fares|Tom Marshall|Superferrariman|
-|Zakary Zisa|JustTy|晟道 杜|Dnialibr Williams|Takumi Fujiwara|
-|Koen van Hal|Jonathan Hill|Marco Siciliano|Kevindosenfutter|Angry Prawn|
-|Natharic 67|Rafael Monteiro|Jacob Ashline|ChironTheFloof|Caleb Dauphinee|
-|Tony |Zac L|AlainMoto FPV|eirik johan johnsen|Elderet|
-|Miles Longmore|lemon head|Viccy|Casey|Kajetan Cupa|
-|Conejero00|Bill Gricko|A cow wearing a turban|Danni Nowicki|Udo Schmidt|
-|Tyler Swords|Constellation Gaming|Manimo|valentine|Jules Schattenberg|
-|Brandon Crotts|Philipp Popetschnigg|Tiziano Della Fazia|goodgamer1109|Joshua Thomas|
-|Jeff Testa|Avery Snyder|Josh Kern|Triptagram|Bayon Antoine|
-|Iván Juárez Núñez|Amery Martinat|ElArGee|Cory Green|lucas Di lorenzo|
-|Caleb Sandersier|||||
+The launcher expects the simulator binary at `build/linux-release/engine-sim-app`, so build the project first.
+
+Typical workflow:
+
+```bash
+make build
+python3 launcher_python/main.py
+```
+
+### Recommended Python setup
+
+Using a local virtual environment keeps the Python tooling isolated:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python launcher_python/main.py
+```
+
+### Tk dependency on Linux
+
+The GUI uses `tkinter`, which depends on Tk being installed on the system.
+
+On Arch Linux:
+
+```bash
+sudo pacman -S tk
+```
+
+You can verify the GUI stack with:
+
+```bash
+python3 -m tkinter
+```
+
+## Project structure
+
+- `src/` and `include/`: core simulator, rendering, and UI code
+- `src/simulation/engine_wear_model.cpp`: wear model implementation
+- `src/ui/engine_wear_cluster.cpp`: wear dashboard rendering
+- `ENGINE_WEAR_METRICS.md`: wear-model metric reference
+- `assets/engines/`: sample engine definitions
+- `launcher_python/`: optional Python launcher GUI
+- `scripts/`: Linux bootstrap, configure, build, test, and run helpers
+
+## Notes
+
+- this repository is actively evolving
+- some historical upstream references may still exist in code or asset names
+- the current fork direction prioritizes V-Twin branding, Linux usability, and engine wear diagnostics
