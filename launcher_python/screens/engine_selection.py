@@ -6,6 +6,7 @@ import config
 from screens.engine_folder_selection import EngineFolderSelectionDialog
 from screens.mode_selection import ModeSelectionScreen
 from screens.ui_scale import compute_ui_scale, scale_font, scale_int
+from screens.engine_schema import draw_engine_schema
 
 
 MONO = "Courier"
@@ -40,12 +41,7 @@ class EngineSelectionScreen:
             max_width=self._s(300),
             max_height=self._s(180),
         )
-        self.engine_art_image = self._load_and_fit_image(
-            "image_moteur_dessein.png",
-            max_width=max(240, self._s(420)),
-            max_height=max(180, self._s(320)),
-        )
-        self.card_width = self._s(760)
+        self.card_width = self._s(560)
         self.card_height = self._s(560)
 
         self._ensure_large_window()
@@ -215,19 +211,16 @@ class EngineSelectionScreen:
             anchor="n",
         )
 
-        if self.engine_art_image:
-            self.card_canvas.create_image(center_x, center_y + self._s(20), image=self.engine_art_image)
-        else:
-            self._draw_engine_icon(center_x, center_y - self._s(30))
-
-        engine_name = Path(self.engine_path).stem.replace("_", " ").replace("-", " ").upper()
-        self.card_canvas.create_text(
-            center_x,
-            y2 - self._s(24),
-            text=engine_name,
-            fill=TEXT_DIM,
-            font=self._font(9),
-            anchor="s",
+        schema_size = min(self.card_width, self.card_height) * 0.55
+        draw_engine_schema(
+            self.card_canvas,
+            self.engine_path,
+            cx=center_x,
+            cy=center_y + self._s(10),
+            size=schema_size,
+            fg=TEXT_DIM,
+            dim="#3a3a3a",
+            accent=ACCENT,
         )
 
     def _draw_border_rect(self, x1, y1, x2, y2, fill, outline, width):
@@ -242,20 +235,6 @@ class EngineSelectionScreen:
         for pts in corners:
             self.card_canvas.create_line(*pts[:2], *pts[2:4], fill=BORDER_BRIGHT, width=self._s(2))
             self.card_canvas.create_line(*pts[2:4], *pts[4:], fill=BORDER_BRIGHT, width=self._s(2))
-
-    def _draw_engine_icon(self, center_x, top_y):
-        c = self.card_canvas
-        fill = "#c8bca8"
-        outline = "#7a6e5e"
-        lw = max(1, self._s(2))
-        c.create_rectangle(center_x - self._s(80), top_y, center_x + self._s(80), top_y + self._s(28), fill=fill, outline=outline, width=lw)
-        c.create_rectangle(center_x - self._s(66), top_y + self._s(24), center_x + self._s(66), top_y + self._s(84), fill=fill, outline=outline, width=lw)
-        c.create_rectangle(center_x - self._s(50), top_y + self._s(78), center_x + self._s(50), top_y + self._s(104), fill=fill, outline=outline, width=lw)
-        c.create_oval(center_x - self._s(90), top_y + self._s(36), center_x - self._s(54), top_y + self._s(72), fill=fill, outline=outline, width=lw)
-        c.create_oval(center_x + self._s(54), top_y + self._s(36), center_x + self._s(90), top_y + self._s(72), fill=fill, outline=outline, width=lw)
-        for off in (-48, -24, 0, 24, 48):
-            ox = self._sv(off)
-            c.create_rectangle(center_x + ox - self._s(9), top_y + self._s(28), center_x + ox + self._s(9), top_y + self._s(72), fill="#ddd0b8", outline=outline, width=max(1, self._s(1)))
 
     def _set_card_state(self, state):
         if state != self.card_state:
