@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import config
+from screens.ui_scale import compute_ui_scale, scale_font, scale_int
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -91,8 +92,10 @@ class EngineFolderSelectionDialog(tk.Toplevel):
         self.engines = find_engines()
         self._engines_by_folder = get_engines_by_folder(self.engines)
         self._filter_var = tk.StringVar(value="All")
+        self.ui_scale = compute_ui_scale(self)
         self._displayed_engines: List[Path] = []
         self._card_widgets: Dict[int, List[tk.Widget]] = {}
+        self._card_columns = 3
         self.selected_engine: Optional[Path] = self._resolve_engine_path(current_engine_path)
 
         self.columnconfigure(0, weight=1)
@@ -118,17 +121,26 @@ class EngineFolderSelectionDialog(tk.Toplevel):
                 parent=self,
             )
 
+    def _s(self, value: int | float, minimum: int = 1) -> int:
+        return scale_int(value, self.ui_scale, minimum=minimum)
+
+    def _font(self, family: str, size: int, *styles: str, min_size: int = 8):
+        return scale_font(self.ui_scale, family, size, *styles, min_size=min_size)
+
     def _set_initial_window_size(self) -> None:
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
-        target_w = min(max(1100, int(screen_w * 0.90)), max(700, screen_w - 40))
-        target_h = min(max(760, int(screen_h * 0.88)), max(520, screen_h - 80))
+        margin_w = self._s(40)
+        margin_h = self._s(80)
+        target_w = min(max(self._s(1100), int(screen_w * 0.90)), max(self._s(700), screen_w - margin_w))
+        target_h = min(max(self._s(760), int(screen_h * 0.88)), max(self._s(520), screen_h - margin_h))
         pos_x = max(0, (screen_w - target_w) // 2)
         pos_y = max(0, (screen_h - target_h) // 2)
 
         self.geometry(f"{target_w}x{target_h}+{pos_x}+{pos_y}")
-        self.minsize(min(1000, target_w), min(680, target_h))
+        self.minsize(min(self._s(1000), target_w), min(self._s(680), target_h))
         self.resizable(True, True)
+        self._card_columns = max(1, min(CARD_COLUMNS, target_w // max(self._s(320), 220)))
 
     def _resolve_engine_path(self, engine_path: str) -> Optional[Path]:
         if not engine_path:
@@ -144,7 +156,7 @@ class EngineFolderSelectionDialog(tk.Toplevel):
 
     def _build_logo(self) -> None:
         container = tk.Frame(self, bg="#0f172a")
-        container.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 8))
+        container.grid(row=0, column=0, sticky="ew", padx=self._s(16), pady=(self._s(12), self._s(8)))
         container.columnconfigure(0, weight=1)
 
         logo_loaded = False
@@ -153,7 +165,7 @@ class EngineFolderSelectionDialog(tk.Toplevel):
             tk.Label(
                 container,
                 text=text,
-                font=("Consolas", 4),
+                font=self._font("Consolas", 4, min_size=4),
                 bg="#0f172a",
                 fg="#e2e8f0",
                 justify="left",
@@ -172,24 +184,24 @@ class EngineFolderSelectionDialog(tk.Toplevel):
             tk.Label(
                 container,
                 text="V-Twin",
-                font=("Segoe UI", 16, "bold"),
+                font=self._font("Segoe UI", 16, "bold"),
                 bg="#0f172a",
                 fg="#e2e8f0",
             ).grid(row=0, column=0)
 
     def _build_engines_section(self) -> None:
         section = tk.Frame(self, bg="#0f172a")
-        section.grid(row=1, column=0, sticky="nsew", padx=16, pady=4)
+        section.grid(row=1, column=0, sticky="nsew", padx=self._s(16), pady=self._s(4))
         section.columnconfigure(0, weight=1)
 
         top = tk.Frame(section, bg="#0f172a")
-        top.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        top.grid(row=0, column=0, sticky="ew", pady=(0, self._s(6)))
         top.columnconfigure(0, weight=1)
 
         tk.Label(
             top,
             text="Available engines",
-            font=("Segoe UI", 10, "bold"),
+            font=self._font("Segoe UI", 10, "bold"),
             bg="#0f172a",
             fg="#cbd5e1",
             anchor="w",
@@ -201,9 +213,9 @@ class EngineFolderSelectionDialog(tk.Toplevel):
             textvariable=self._filter_var,
             values=filter_options,
             state="readonly",
-            width=14,
+            width=max(10, self._s(14)),
         )
-        self._filter_combo.grid(row=0, column=1, sticky="e", padx=(8, 0))
+        self._filter_combo.grid(row=0, column=1, sticky="e", padx=(self._s(8), 0))
         self._filter_combo.set("All")
         self._filter_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_engine_list())
 
@@ -271,12 +283,12 @@ class EngineFolderSelectionDialog(tk.Toplevel):
                 continue
 
             block = tk.Frame(self._engine_grid_frame, bg="#0f172a")
-            block.pack(fill="x", pady=(12, 0))
+            block.pack(fill="x", pady=(self._s(12), 0))
 
             tk.Label(
                 block,
                 text=f"- {folder_name} -",
-                font=("Segoe UI", 10, "bold"),
+                font=self._font("Segoe UI", 10, "bold"),
                 bg="#0f172a",
                 fg="#94a3b8",
                 anchor="w",
@@ -285,11 +297,11 @@ class EngineFolderSelectionDialog(tk.Toplevel):
             tk.Label(
                 block,
                 text=f"[{folder_name.replace('-', ' ').title()} engines]",
-                font=("Segoe UI", 9),
+                font=self._font("Segoe UI", 9),
                 bg="#0f172a",
                 fg="#64748b",
                 anchor="w",
-            ).pack(fill="x", pady=(0, 6))
+            ).pack(fill="x", pady=(0, self._s(6)))
 
             cards_frame = tk.Frame(block, bg="#0f172a")
             cards_frame.pack(fill="x")
@@ -298,22 +310,22 @@ class EngineFolderSelectionDialog(tk.Toplevel):
                 global_idx = len(self._displayed_engines)
                 self._displayed_engines.append(engine)
                 name, _ = format_engine_display(engine)
-                row, col = divmod(idx, CARD_COLUMNS)
+                row, col = divmod(idx, self._card_columns)
 
                 frame = tk.Frame(cards_frame, bg=bg_normal, bd=0, highlightthickness=0)
-                frame.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+                frame.grid(row=row, column=col, sticky="nsew", padx=self._s(4), pady=self._s(4))
                 cards_frame.columnconfigure(col, weight=1)
 
                 label = tk.Label(
                     frame,
                     text=name[:24] + ("..." if len(name) > 24 else ""),
-                    font=("Segoe UI", 10),
+                    font=self._font("Segoe UI", 10),
                     bg=bg_normal,
                     fg="#e2e8f0",
                     anchor="center",
-                    wraplength=140,
+                    wraplength=max(self._s(140), 90),
                 )
-                label.pack(fill="both", expand=True, padx=10, pady=8)
+                label.pack(fill="both", expand=True, padx=self._s(10), pady=self._s(8))
 
                 self._card_widgets[global_idx] = [frame, label]
 
@@ -359,14 +371,14 @@ class EngineFolderSelectionDialog(tk.Toplevel):
 
     def _build_selected_line(self) -> None:
         container = tk.Frame(self, bg="#0f172a")
-        container.grid(row=2, column=0, sticky="ew", padx=16, pady=8)
+        container.grid(row=2, column=0, sticky="ew", padx=self._s(16), pady=self._s(8))
         container.columnconfigure(0, weight=1)
 
         self._selected_var = tk.StringVar(value="Selected engine: -")
         tk.Label(
             container,
             textvariable=self._selected_var,
-            font=("Segoe UI", 9),
+            font=self._font("Segoe UI", 9),
             bg="#0f172a",
             fg="#94a3b8",
             anchor="w",
@@ -374,7 +386,7 @@ class EngineFolderSelectionDialog(tk.Toplevel):
 
     def _build_buttons(self) -> None:
         footer = tk.Frame(self, bg="#0f172a")
-        footer.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 16))
+        footer.grid(row=3, column=0, sticky="ew", padx=self._s(16), pady=(0, self._s(16)))
         footer.columnconfigure(0, weight=1)
 
         ttk.Button(footer, text="Confirm", command=self._on_confirm).grid(row=0, column=0, sticky="w")
