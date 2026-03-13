@@ -3,6 +3,7 @@
 #include "app/engine_sim_application.h"
 #include "domain/engine/engine.h"
 #include "simulation/simulator.h"
+#include "ui/engine_wear_cluster.h"
 #include "ui/oscilloscope.h"
 
 #include <sstream>
@@ -11,6 +12,7 @@ OscilloscopeCluster::OscilloscopeCluster() {
     m_simulator = nullptr;
     m_torqueScope = nullptr;
     m_powerScope = nullptr;
+    m_engineWearCluster = nullptr;
     m_totalExhaustFlowScope = nullptr;
     m_intakeFlowScope = nullptr;
     m_exhaustFlowScope = nullptr;
@@ -31,6 +33,7 @@ OscilloscopeCluster::OscilloscopeCluster() {
 
     m_updatePeriod = 0.25f;
     m_updateTimer = 0.0f;
+    m_engineWearModeEnabled = true;
 }
 
 OscilloscopeCluster::~OscilloscopeCluster() {
@@ -42,6 +45,7 @@ void OscilloscopeCluster::initialize(EngineSimApplication *app) {
 
     m_torqueScope = addElement<Oscilloscope>(this);
     m_powerScope = addElement<Oscilloscope>(this);
+    m_engineWearCluster = addElement<EngineWearCluster>();
     m_exhaustFlowScope = addElement<Oscilloscope>(this);
     m_totalExhaustFlowScope = addElement<Oscilloscope>(this);
     m_intakeFlowScope = addElement<Oscilloscope>(this);
@@ -260,10 +264,20 @@ void OscilloscopeCluster::update(float dt) {
 
     m_updateTimer -= dt;
 
+    if (m_engineWearModeEnabled) {
+        m_engineWearCluster->update(dt);
+        return;
+    }
+
     UiElement::update(dt);
 }
 
 void OscilloscopeCluster::render() {
+    if (m_engineWearModeEnabled) {
+        m_engineWearCluster->renderDashboard(m_bounds);
+        return;
+    }
+
     Grid grid;
     grid.h_cells = 3;
     grid.v_cells = 4;
@@ -366,6 +380,7 @@ void OscilloscopeCluster::sample() {
 
 void OscilloscopeCluster::setSimulator(Simulator *simulator) {
     m_simulator = simulator;
+    m_engineWearCluster->setSimulator(simulator);
 }
 
 void OscilloscopeCluster::renderScope(

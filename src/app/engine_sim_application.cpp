@@ -250,7 +250,7 @@ void EngineSimApplication::initialize() {
 }
 
 void EngineSimApplication::process(float frame_dt) {
-    frame_dt = static_cast<float>(clamp(frame_dt, 1 / 200.0f, 1 / 30.0f));
+    frame_dt = std::min(frame_dt, 1 / 30.0f);
 
     double speed = 1.0;
     if (m_engine.IsKeyDown(ysKey::Code::N1)) {
@@ -281,8 +281,7 @@ void EngineSimApplication::process(float frame_dt) {
 
     m_simulator->setSimulationSpeed(speed);
 
-    const double avgFramerate = clamp(m_engine.GetAverageFramerate(), 30.0f, 1000.0f);
-    m_simulator->startFrame(1 / avgFramerate);
+    m_simulator->startFrame(frame_dt);
 
     const auto procStart = std::chrono::steady_clock::now();
     const int iterationCount = m_simulator->getFrameIterationCount();

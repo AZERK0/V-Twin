@@ -7,6 +7,7 @@
 #include <string>
 
 class Simulator;
+class EngineWearCluster;
 
 class OscilloscopeCluster : public UiElement {
     private:
@@ -25,6 +26,9 @@ class OscilloscopeCluster : public UiElement {
 
         void sample();
         void setSimulator(Simulator *simulator);
+        void setEngineWearModeEnabled(bool enabled) { m_engineWearModeEnabled = enabled; }
+        void toggleEngineWearMode() { m_engineWearModeEnabled = !m_engineWearModeEnabled; }
+        bool isEngineWearModeEnabled() const { return m_engineWearModeEnabled; }
 
         Oscilloscope *getTotalExhaustFlowOscilloscope() const { return m_totalExhaustFlowScope; }
         Oscilloscope *getExhaustFlowOscilloscope() const { return m_exhaustFlowScope; }
@@ -46,6 +50,7 @@ class OscilloscopeCluster : public UiElement {
             bool overlay = false);
 
         Simulator *m_simulator;
+        EngineWearCluster *m_engineWearCluster;
         Oscilloscope
             *m_torqueScope,
             *m_powerScope,
@@ -68,6 +73,7 @@ class OscilloscopeCluster : public UiElement {
 
         std::string m_powerUnits;
         std::string m_torqueUnits;
+        bool m_engineWearModeEnabled;
 
 };
 
