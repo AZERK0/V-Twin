@@ -28,7 +28,7 @@ def configure_large_window(root):
 
 def main():
     root = tk.Tk()
-    root.title("V-Twin - Engine Launcher")
+    root.title("V-TWIN // ENGINE LAUNCHER")
     configure_large_window(root)
 
     EngineSelectionScreen(root)

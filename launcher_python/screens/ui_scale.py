@@ -1,10 +1,10 @@
 import tkinter as tk
 
 
-BASE_WIDTH = 3000
-BASE_HEIGHT = 2000
-MIN_SCALE = 0.65
-MAX_SCALE = 1.0
+BASE_WIDTH = 2200
+BASE_HEIGHT = 1400
+MIN_SCALE = 0.80
+MAX_SCALE = 1.2
 
 
 def compute_ui_scale(
