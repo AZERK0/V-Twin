@@ -1,6 +1,7 @@
 #include "app/engine_sim_application.h"
 
 #include "domain/engine/engine.h"
+#include "ui/engine_condition_cluster.h"
 #include "ui/engine_view.h"
 #include "ui/info_cluster.h"
 #include "ui/load_simulation_cluster.h"
@@ -41,6 +42,7 @@ void EngineSimApplication::layoutScreen0(const Bounds &windowBounds) {
     m_loadSimulationCluster->setVisible(true);
     m_mixerCluster->setVisible(true);
     m_infoCluster->setVisible(true);
+    m_engineConditionCluster->setVisible(false);
 
     m_oscCluster->activate();
 }
@@ -58,6 +60,7 @@ void EngineSimApplication::layoutScreen1(const Bounds &windowBounds) {
     m_loadSimulationCluster->setVisible(false);
     m_mixerCluster->setVisible(false);
     m_infoCluster->setVisible(false);
+    m_engineConditionCluster->setVisible(false);
 }
 
 void EngineSimApplication::layoutScreen2(const Bounds &windowBounds) {
@@ -79,6 +82,23 @@ void EngineSimApplication::layoutScreen2(const Bounds &windowBounds) {
     m_loadSimulationCluster->setVisible(false);
     m_mixerCluster->setVisible(false);
     m_infoCluster->setVisible(false);
+    m_engineConditionCluster->setVisible(false);
+}
+
+void EngineSimApplication::layoutScreen3(const Bounds &windowBounds) {
+    m_engineView->setDrawFrame(false);
+    m_engineView->setBounds(windowBounds);
+    m_engineConditionCluster->m_bounds = windowBounds;
+    m_engineConditionCluster->activate();
+
+    m_engineView->setVisible(false);
+    m_rightGaugeCluster->setVisible(false);
+    m_oscCluster->setVisible(false);
+    m_performanceCluster->setVisible(false);
+    m_loadSimulationCluster->setVisible(false);
+    m_mixerCluster->setVisible(false);
+    m_infoCluster->setVisible(false);
+    m_engineConditionCluster->setVisible(true);
 }
 
 void EngineSimApplication::updateRenderTarget(int screenHeight) {
@@ -125,8 +145,11 @@ void EngineSimApplication::renderScene() {
     else if (m_screen == 1) {
         layoutScreen1(windowBounds);
     }
-    else {
+    else if (m_screen == 2) {
         layoutScreen2(windowBounds);
+    }
+    else {
+        layoutScreen3(windowBounds);
     }
 
     updateRenderTarget(screenHeight);
@@ -152,6 +175,7 @@ void EngineSimApplication::refreshUserInterface() {
     m_uiManager.initialize(this);
 
     m_engineView = m_uiManager.getRoot()->addElement<EngineView>();
+    m_engineConditionCluster = m_uiManager.getRoot()->addElement<EngineConditionCluster>();
     m_rightGaugeCluster = m_uiManager.getRoot()->addElement<RightGaugeCluster>();
     m_oscCluster = m_uiManager.getRoot()->addElement<OscilloscopeCluster>();
     m_performanceCluster = m_uiManager.getRoot()->addElement<PerformanceCluster>();
@@ -160,6 +184,7 @@ void EngineSimApplication::refreshUserInterface() {
     m_infoCluster = m_uiManager.getRoot()->addElement<InfoCluster>();
 
     m_infoCluster->setEngine(m_iceEngine);
+    m_engineConditionCluster->setSimulator(m_simulator);
     m_rightGaugeCluster->m_simulator = m_simulator;
     m_rightGaugeCluster->setEngine(m_iceEngine);
     m_oscCluster->setSimulator(m_simulator);

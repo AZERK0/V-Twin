@@ -6,7 +6,7 @@
 #include "domain/vehicle/dynamometer.h"
 #include "domain/vehicle/starter_motor.h"
 #include "domain/vehicle/vehicle_drag_constraint.h"
-#include "simulation/engine_wear_model.h"
+#include "simulation/engine_condition_model.h"
 #include "simulation/engine_thermal_model.h"
 
 #include <chrono>
@@ -76,7 +76,7 @@ public:
     virtual double getDynoPower() const;
     virtual double getAverageOutputSignal() const;
 
-    const EngineWearState &getEngineWearState() const { return m_engineWearModel.getState(); }
+    const EngineConditionState &getEngineConditionState() const { return m_engineConditionModel.getState(); }
     const EngineThermalState &getEngineThermalState() const { return m_engineThermalModel.getState(); }
 
     double filteredEngineSpeed() const { return m_filteredEngineSpeed; }
@@ -123,7 +123,7 @@ private:
 
     double m_filteredEngineSpeed;
 
-    EngineWearModel m_engineWearModel;
+    EngineConditionModel m_engineConditionModel;
     EngineThermalModel m_engineThermalModel;
     std::vector<CylinderThermalSample> m_cylinderThermalSamples;
 

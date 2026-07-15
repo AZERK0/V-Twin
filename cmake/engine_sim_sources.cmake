@@ -28,7 +28,7 @@ set(ENGINE_SIM_CORE_SOURCES
     src/audio/low_pass_filter.cpp
     src/domain/engine/part.cpp
     src/domain/engine/piston.cpp
-    src/simulation/engine_wear_model.cpp
+    src/simulation/engine_condition_model.cpp
     src/simulation/engine_thermal_model.cpp
     src/simulation/piston_engine_simulator.cpp
     src/simulation/simulator.cpp
@@ -76,7 +76,7 @@ set(ENGINE_SIM_CORE_HEADERS
     include/audio/low_pass_filter.h
     include/domain/engine/part.h
     include/domain/engine/piston.h
-    include/simulation/engine_wear_model.h
+    include/simulation/engine_condition_model.h
     include/simulation/engine_thermal_model.h
     include/simulation/piston_engine_simulator.h
     include/simulation/simulator.h
@@ -117,7 +117,7 @@ set(ENGINE_SIM_APP_SOURCES
     src/ui/oscilloscope.cpp
     src/rendering/shaders.cpp
     src/ui/engine_view.cpp
-    src/ui/engine_wear_cluster.cpp
+    src/ui/engine_condition_cluster.cpp
     src/ui/right_gauge_cluster.cpp
     src/ui/cylinder_temperature_gauge.cpp
     src/ui/labeled_gauge.cpp
@@ -154,7 +154,7 @@ set(ENGINE_SIM_APP_HEADERS
     include/ui/oscilloscope.h
     include/rendering/shaders.h
     include/ui/engine_view.h
-    include/ui/engine_wear_cluster.h
+    include/ui/engine_condition_cluster.h
     include/ui/right_gauge_cluster.h
     include/ui/cylinder_temperature_gauge.h
     include/ui/labeled_gauge.h
@@ -209,6 +209,7 @@ set(ENGINE_SIM_SCRIPT_HEADERS
 )
 
 set(ENGINE_SIM_TEST_SOURCES
+    test/engine_condition_model_tests.cpp
     test/engine_thermal_model_tests.cpp
     test/gas_system_tests.cpp
     test/function_test.cpp

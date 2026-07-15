@@ -72,6 +72,7 @@ EngineSimApplication::EngineSimApplication() {
 
     m_simulator = nullptr;
     m_engineView = nullptr;
+    m_engineConditionCluster = nullptr;
     m_rightGaugeCluster = nullptr;
     m_temperatureGauge = nullptr;
     m_oscCluster = nullptr;
@@ -414,7 +415,7 @@ void EngineSimApplication::run() {
         }
 
         if (m_engine.ProcessKeyDown(ysKey::Code::Tab)) {
-            m_screen = (m_screen + 1) % 3;
+            m_screen = (m_screen + 1) % 4;
         }
 
         if (m_engine.ProcessKeyDown(ysKey::Code::F)) {

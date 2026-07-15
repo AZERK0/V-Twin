@@ -16,6 +16,7 @@
 
 class CylinderTemperatureGauge;
 class Engine;
+class EngineConditionCluster;
 class EngineView;
 class InfoCluster;
 class LoadSimulationCluster;
@@ -106,6 +107,7 @@ class EngineSimApplication {
         void layoutScreen0(const Bounds &windowBounds);
         void layoutScreen1(const Bounds &windowBounds);
         void layoutScreen2(const Bounds &windowBounds);
+        void layoutScreen3(const Bounds &windowBounds);
         void updateRenderTarget(int screenHeight);
 
         void refreshUserInterface();
@@ -160,6 +162,7 @@ class EngineSimApplication {
 
         UiManager m_uiManager;
         EngineView *m_engineView;
+        EngineConditionCluster *m_engineConditionCluster;
         RightGaugeCluster *m_rightGaugeCluster;
         OscilloscopeCluster *m_oscCluster;
         CylinderTemperatureGauge *m_temperatureGauge;
