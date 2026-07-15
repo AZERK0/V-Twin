@@ -314,6 +314,8 @@ void PistonEngineSimulator::simulateStep_() {
         for (int j = 0; j < cylinderCount; ++j) {
             m_engine->getChamber(j)->flow(fluidTimestep);
         }
+
+        updateEngineThermalModel(fluidTimestep);
     }
 
     im->resetIgnitionEvents();

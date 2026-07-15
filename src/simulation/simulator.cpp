@@ -57,6 +57,7 @@ void Simulator::loadSimulation(Engine *engine, Vehicle *vehicle, Transmission *t
     m_vehicle = vehicle;
     m_transmission = transmission;
     m_engineWearModel.reset();
+    initializeEngineThermalModel();
 }
 
 void Simulator::releaseSimulation() {
@@ -179,6 +180,8 @@ void Simulator::destroy() {
     m_dynoTorqueSamples = nullptr;
     m_synthesizer.destroy();
     m_engineWearModel.reset();
+    m_engineThermalModel.reset();
+    m_cylinderThermalSamples.clear();
 }
 
 void Simulator::startAudioRenderingThread() {
@@ -225,6 +228,43 @@ void Simulator::initializeSynthesizer() {
 }
 
 void Simulator::simulateStep_() {
+}
+
+void Simulator::updateEngineThermalModel(double dt) {
+    if (m_engine == nullptr || m_cylinderThermalSamples.empty()) {
+        return;
+    }
+
+    for (int i = 0; i < m_engine->getCylinderCount(); ++i) {
+        CombustionChamber *chamber = m_engine->getChamber(i);
+        CylinderThermalSample &sample = m_cylinderThermalSamples[i];
+        sample.gasTemperatureK = chamber->m_system.temperature();
+        sample.gasPressurePa = chamber->m_system.pressure();
+        sample.chamberVolumeM3 = chamber->getVolume();
+        sample.meanPistonSpeedMPerS = chamber->calculateMeanPistonSpeed();
+        sample.frictionPowerW = chamber->getFrictionPower();
+    }
+    m_engineThermalModel.update(m_cylinderThermalSamples, dt);
+}
+
+void Simulator::initializeEngineThermalModel() {
+    m_engineThermalModel.reset();
+    m_cylinderThermalSamples.clear();
+    if (m_engine == nullptr || m_engine->getCylinderCount() <= 0) {
+        return;
+    }
+
+    std::vector<CylinderThermalProperties> properties(m_engine->getCylinderCount());
+    for (int i = 0; i < m_engine->getCylinderCount(); ++i) {
+        CombustionChamber *chamber = m_engine->getChamber(i);
+        CylinderThermalProperties &cylinder = properties[i];
+        cylinder.pistonMassKg = chamber->getPiston()->getMass();
+        cylinder.boreM = chamber->getPiston()->getCylinderBank()->getBore();
+        cylinder.combustionChamberVolumeM3 = chamber->getCylinderHead()->getCombustionChamberVolume();
+    }
+    if (m_engineThermalModel.initialize(m_engine->getThermalParameters(), properties)) {
+        m_cylinderThermalSamples.resize(properties.size());
+    }
 }
 
 void Simulator::updateFilteredEngineSpeed(double dt) {

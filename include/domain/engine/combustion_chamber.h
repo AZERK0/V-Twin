@@ -56,6 +56,7 @@ class CombustionChamber : public atg_scs::ForceGenerator {
         Piston *getPiston() const { return m_piston; }
 
         double getFrictionForce() const;
+        double getFrictionPower() const;
         double getVolume() const;
         double pistonSpeed() const;
         double calculateMeanPistonSpeed() const;
@@ -92,6 +93,7 @@ class CombustionChamber : public atg_scs::ForceGenerator {
 
     protected:
         double calculateFrictionForce(double v) const;
+        double calculateAppliedFrictionForce(double v) const;
         void updateCycleStates();
 
         double m_intakeFlowRate;

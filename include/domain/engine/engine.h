@@ -12,6 +12,7 @@
 #include "domain/engine/ignition_module.h"
 #include "domain/engine/intake.h"
 #include "domain/engine/combustion_chamber.h"
+#include "domain/engine/engine_thermal_parameters.h"
 #include "units.h"
 #include "domain/engine/throttle.h"
 
@@ -44,6 +45,8 @@ class Engine : public Part {
             double initialHighFrequencyGain;
             double initialNoise;
             double initialJitter;
+
+            EngineThermalParameters thermalParameters;
         };
 
     public:
@@ -106,6 +109,7 @@ class Engine : public Part {
         double getInitialHighFrequencyGain() const { return m_initialHighFrequencyGain; }
         double getInitialNoise() const { return m_initialNoise; }
         double getInitialJitter() const { return m_initialJitter; }
+        const EngineThermalParameters &getThermalParameters() const { return m_thermalParameters; }
 
         virtual Simulator *createSimulator(Vehicle *vehicle, Transmission *transmission);
 
@@ -135,6 +139,7 @@ class Engine : public Part {
         double m_initialHighFrequencyGain;
         double m_initialNoise;
         double m_initialJitter;
+        EngineThermalParameters m_thermalParameters;
 
         ExhaustSystem *m_exhaustSystems;
         int m_exhaustSystemCount;

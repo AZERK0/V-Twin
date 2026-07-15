@@ -417,11 +417,7 @@ void CombustionChamber::apply(atg_scs::SystemState *system) {
         assert(false);
     }
 
-    constexpr double limit = 1E-3;
-    const double abs_v_s = std::fmin(std::abs(v_s), limit);
-    const double attenuation = abs_v_s / limit;
-
-    const double F = calculateFrictionForce(v_s) * attenuation;
+    const double F = calculateAppliedFrictionForce(v_s);
     const double F_fric = (v_s > 0)
         ? -F
         : F;
@@ -443,4 +439,15 @@ double CombustionChamber::getFrictionForce() const {
         v_x * bank->getDx() + v_y * bank->getDy();
 
     return calculateFrictionForce(v_s);
+}
+
+double CombustionChamber::getFrictionPower() const {
+    const double speed = pistonSpeed();
+    return std::abs(calculateAppliedFrictionForce(speed) * speed);
+}
+
+double CombustionChamber::calculateAppliedFrictionForce(double v_s) const {
+    constexpr double attenuationSpeed = 1e-3;
+    const double attenuation = std::min(std::abs(v_s), attenuationSpeed) / attenuationSpeed;
+    return calculateFrictionForce(v_s) * attenuation;
 }

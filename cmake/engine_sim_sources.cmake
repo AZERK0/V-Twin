@@ -29,6 +29,7 @@ set(ENGINE_SIM_CORE_SOURCES
     src/domain/engine/part.cpp
     src/domain/engine/piston.cpp
     src/simulation/engine_wear_model.cpp
+    src/simulation/engine_thermal_model.cpp
     src/simulation/piston_engine_simulator.cpp
     src/simulation/simulator.cpp
     src/domain/engine/standard_valvetrain.cpp
@@ -58,6 +59,7 @@ set(ENGINE_SIM_CORE_HEADERS
     include/domain/engine/direct_throttle_linkage.h
     include/domain/vehicle/dynamometer.h
     include/domain/engine/engine.h
+    include/domain/engine/engine_thermal_parameters.h
     include/domain/engine/exhaust_system.h
     include/audio/feedback_comb_filter.h
     include/audio/filter.h
@@ -75,6 +77,7 @@ set(ENGINE_SIM_CORE_HEADERS
     include/domain/engine/part.h
     include/domain/engine/piston.h
     include/simulation/engine_wear_model.h
+    include/simulation/engine_thermal_model.h
     include/simulation/piston_engine_simulator.h
     include/simulation/simulator.h
     include/domain/engine/standard_valvetrain.h
@@ -206,6 +209,7 @@ set(ENGINE_SIM_SCRIPT_HEADERS
 )
 
 set(ENGINE_SIM_TEST_SOURCES
+    test/engine_thermal_model_tests.cpp
     test/gas_system_tests.cpp
     test/function_test.cpp
     test/synthesizer_tests.cpp

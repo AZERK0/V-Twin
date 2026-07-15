@@ -7,8 +7,10 @@
 #include "domain/vehicle/starter_motor.h"
 #include "domain/vehicle/vehicle_drag_constraint.h"
 #include "simulation/engine_wear_model.h"
+#include "simulation/engine_thermal_model.h"
 
 #include <chrono>
+#include <vector>
 
 class Transmission;
 class Vehicle;
@@ -75,6 +77,7 @@ public:
     virtual double getAverageOutputSignal() const;
 
     const EngineWearState &getEngineWearState() const { return m_engineWearModel.getState(); }
+    const EngineThermalState &getEngineThermalState() const { return m_engineThermalModel.getState(); }
 
     double filteredEngineSpeed() const { return m_filteredEngineSpeed; }
 
@@ -85,11 +88,13 @@ protected:
     void initializeSynthesizer();
     virtual void simulateStep_();
     virtual void writeToSynthesizer() = 0;
+    void updateEngineThermalModel(double dt);
 
     atg_scs::RigidBodySystem *m_system;
 
 private:
     void updateFilteredEngineSpeed(double dt);
+    void initializeEngineThermalModel();
 
 private:
     atg_scs::RigidBody m_vehicleMass;
@@ -119,6 +124,8 @@ private:
     double m_filteredEngineSpeed;
 
     EngineWearModel m_engineWearModel;
+    EngineThermalModel m_engineThermalModel;
+    std::vector<CylinderThermalSample> m_cylinderThermalSamples;
 
     int m_steps;
 };
