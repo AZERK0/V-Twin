@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <utility>
 
 namespace {
     constexpr double MinimumGasPressureBar = 0.05;
@@ -163,13 +164,13 @@ void EngineThermalModel::integrateAccumulatedEnergy() {
     }
 
     const double oilPowerW = calculateOilPower(m_accumulatedTimeSeconds);
-    applyTemperatureChanges(
+    const bool temperaturesUpdated = applyTemperatureChanges(
         pistonPowersW,
         cylinderPowersW,
         oilPowerW,
         m_accumulatedTimeSeconds);
     clearAccumulator();
-    if (temperaturesAreValid()) {
+    if (temperaturesUpdated) {
         publishState();
     }
     else {
@@ -216,29 +217,40 @@ double EngineThermalModel::calculateOilPower(double elapsedSeconds) const {
     return oilPowerW;
 }
 
-void EngineThermalModel::applyTemperatureChanges(
+bool EngineThermalModel::applyTemperatureChanges(
     const std::vector<double> &pistonPowersW,
     const std::vector<double> &cylinderPowersW,
     double oilPowerW,
     double dt)
 {
+    std::vector<CylinderThermalState> nextCylinderStates = m_cylinderStates;
     for (int i = 0; i < static_cast<int>(m_cylinderStates.size()); ++i) {
         const double pistonCapacity = m_cylinderProperties[i].pistonMassKg
             * m_parameters.pistonSpecificHeatJPerKgK;
-        m_cylinderStates[i].pistonTemperatureK += dt * pistonPowersW[i] / pistonCapacity;
-        m_cylinderStates[i].cylinderTemperatureK += dt * cylinderPowersW[i]
+        nextCylinderStates[i].pistonTemperatureK += dt * pistonPowersW[i] / pistonCapacity;
+        nextCylinderStates[i].cylinderTemperatureK += dt * cylinderPowersW[i]
             / m_parameters.cylinderThermalCapacityJPerK;
     }
-    m_oilTemperatureK += dt * oilPowerW / m_parameters.oilThermalCapacityJPerK();
+    const double nextOilTemperatureK = m_oilTemperatureK
+        + dt * oilPowerW / m_parameters.oilThermalCapacityJPerK();
+    if (!temperaturesAreValid(nextCylinderStates, nextOilTemperatureK)) {
+        return false;
+    }
+    m_cylinderStates = std::move(nextCylinderStates);
+    m_oilTemperatureK = nextOilTemperatureK;
+    return true;
 }
 
-bool EngineThermalModel::temperaturesAreValid() const {
-    if (!isPositiveFinite(m_oilTemperatureK)) {
+bool EngineThermalModel::temperaturesAreValid(
+    const std::vector<CylinderThermalState> &cylinderStates,
+    double oilTemperatureK) const
+{
+    if (!isPositiveFinite(oilTemperatureK)) {
         return false;
     }
     return std::all_of(
-        m_cylinderStates.begin(),
-        m_cylinderStates.end(),
+        cylinderStates.begin(),
+        cylinderStates.end(),
         [](const CylinderThermalState &state) {
             return isPositiveFinite(state.pistonTemperatureK)
                 && isPositiveFinite(state.cylinderTemperatureK);
@@ -282,10 +294,11 @@ double EngineThermalModel::calculatePistonGasPower(
     const double heatTransferCoefficient = calculateHohenbergHeatTransferCoefficient(m_parameters, sample);
     const double pistonArea = m_parameters.pistonGasSurfaceFactor
         * boreArea(m_cylinderProperties[cylinderIndex].boreM);
+    const double gasTemperatureK = std::max(sample.gasTemperatureK, MinimumGasTemperatureK);
     return m_parameters.pistonGasHeatTransferFactor
         * heatTransferCoefficient
         * pistonArea
-        * (sample.gasTemperatureK - m_cylinderStates[cylinderIndex].pistonTemperatureK);
+        * (gasTemperatureK - m_cylinderStates[cylinderIndex].pistonTemperatureK);
 }
 
 double EngineThermalModel::calculateCylinderGasPower(
@@ -299,8 +312,9 @@ double EngineThermalModel::calculateCylinderGasPower(
             / boreArea(properties.boreM));
     const double cylinderArea = m_parameters.cylinderGasSurfaceFactor
         * constants::pi * properties.boreM * exposedHeight;
+    const double gasTemperatureK = std::max(sample.gasTemperatureK, MinimumGasTemperatureK);
     return m_parameters.cylinderGasHeatTransferFactor
         * calculateHohenbergHeatTransferCoefficient(m_parameters, sample)
         * cylinderArea
-        * (sample.gasTemperatureK - m_cylinderStates[cylinderIndex].cylinderTemperatureK);
+        * (gasTemperatureK - m_cylinderStates[cylinderIndex].cylinderTemperatureK);
 }

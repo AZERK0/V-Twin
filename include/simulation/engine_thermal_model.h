@@ -66,9 +66,11 @@ private:
     double calculatePistonPower(int cylinderIndex, double elapsedSeconds) const;
     double calculateCylinderPower(int cylinderIndex, double elapsedSeconds) const;
     double calculateOilPower(double elapsedSeconds) const;
-    void applyTemperatureChanges(const std::vector<double> &pistonPowersW,
+    bool applyTemperatureChanges(const std::vector<double> &pistonPowersW,
         const std::vector<double> &cylinderPowersW, double oilPowerW, double dt);
-    bool temperaturesAreValid() const;
+    bool temperaturesAreValid(
+        const std::vector<CylinderThermalState> &cylinderStates,
+        double oilTemperatureK) const;
     void publishState();
     void clearAccumulator();
     double calculatePistonGasPower(int cylinderIndex, const CylinderThermalSample &sample) const;

@@ -73,6 +73,30 @@ public node engine_parameters {
     input fuel: fuel();
 }
 
+public node engine_thermal_parameters {
+    input ambient_temperature: 25 * units.C + units.K0;
+    input piston_specific_heat: 900 * units.J / (units.kg * units.K);
+    input cylinder_thermal_capacity: 2000 * units.J / units.K;
+    input oil_volume: 3 * units.L;
+    input oil_density: 850 * units.kg / units.m3;
+    input oil_specific_heat: 2000 * units.J / (units.kg * units.K);
+    input piston_cylinder_conductance: 6 * units.J / (units.sec * units.K);
+    input piston_oil_conductance: 8 * units.J / (units.sec * units.K);
+    input cylinder_oil_conductance: 10 * units.J / (units.sec * units.K);
+    input cylinder_ambient_conductance: 10 * units.J / (units.sec * units.K);
+    input oil_ambient_conductance: 5 * units.J / (units.sec * units.K);
+    input piston_friction_heat_fraction: 0.35;
+    input cylinder_friction_heat_fraction: 0.45;
+    input oil_friction_heat_fraction: 0.20;
+    input piston_gas_surface_factor: 1.0;
+    input cylinder_gas_surface_factor: 1.0;
+    input piston_gas_heat_transfer_factor: 1.0;
+    input cylinder_gas_heat_transfer_factor: 1.0;
+    input hohenberg_coefficient: 130.0;
+    input maximum_heat_transfer_coefficient: 5000 * units.J / (units.sec * units.m2 * units.K);
+    input update_interval: 0.02 * units.sec;
+}
+
 private node _engine => __engine_sim__engine {
     input name [string];
     
@@ -90,6 +114,28 @@ private node _engine => __engine_sim__engine {
     input hf_gain [float];
     input jitter [float];
     input noise [float];
+
+    input thermal_ambient_temperature [float];
+    input thermal_piston_specific_heat [float];
+    input thermal_cylinder_capacity [float];
+    input thermal_oil_volume [float];
+    input thermal_oil_density [float];
+    input thermal_oil_specific_heat [float];
+    input thermal_piston_cylinder_conductance [float];
+    input thermal_piston_oil_conductance [float];
+    input thermal_cylinder_oil_conductance [float];
+    input thermal_cylinder_ambient_conductance [float];
+    input thermal_oil_ambient_conductance [float];
+    input thermal_piston_friction_fraction [float];
+    input thermal_cylinder_friction_fraction [float];
+    input thermal_oil_friction_fraction [float];
+    input thermal_piston_surface_factor [float];
+    input thermal_cylinder_surface_factor [float];
+    input thermal_piston_transfer_factor [float];
+    input thermal_cylinder_transfer_factor [float];
+    input thermal_hohenberg_coefficient [float];
+    input thermal_maximum_transfer_coefficient [float];
+    input thermal_update_interval [float];
 
     alias output __out [engine_channel];
 }
@@ -114,6 +160,7 @@ public node engine {
     input hf_gain: 0.01;
     input jitter: 0.5;
     input noise: 1.0;
+    input thermal: engine_thermal_parameters();
 
     alias output __out [_engine]:
         _engine(
@@ -132,7 +179,29 @@ public node engine {
             simulation_frequency: simulation_frequency,
             hf_gain: hf_gain,
             jitter: jitter,
-            noise: noise
+            noise: noise,
+
+            thermal_ambient_temperature: thermal.ambient_temperature,
+            thermal_piston_specific_heat: thermal.piston_specific_heat,
+            thermal_cylinder_capacity: thermal.cylinder_thermal_capacity,
+            thermal_oil_volume: thermal.oil_volume,
+            thermal_oil_density: thermal.oil_density,
+            thermal_oil_specific_heat: thermal.oil_specific_heat,
+            thermal_piston_cylinder_conductance: thermal.piston_cylinder_conductance,
+            thermal_piston_oil_conductance: thermal.piston_oil_conductance,
+            thermal_cylinder_oil_conductance: thermal.cylinder_oil_conductance,
+            thermal_cylinder_ambient_conductance: thermal.cylinder_ambient_conductance,
+            thermal_oil_ambient_conductance: thermal.oil_ambient_conductance,
+            thermal_piston_friction_fraction: thermal.piston_friction_heat_fraction,
+            thermal_cylinder_friction_fraction: thermal.cylinder_friction_heat_fraction,
+            thermal_oil_friction_fraction: thermal.oil_friction_heat_fraction,
+            thermal_piston_surface_factor: thermal.piston_gas_surface_factor,
+            thermal_cylinder_surface_factor: thermal.cylinder_gas_surface_factor,
+            thermal_piston_transfer_factor: thermal.piston_gas_heat_transfer_factor,
+            thermal_cylinder_transfer_factor: thermal.cylinder_gas_heat_transfer_factor,
+            thermal_hohenberg_coefficient: thermal.hohenberg_coefficient,
+            thermal_maximum_transfer_coefficient: thermal.maximum_heat_transfer_coefficient,
+            thermal_update_interval: thermal.update_interval
         );
 }
 

@@ -164,8 +164,34 @@ namespace es_script {
             addInput("hf_gain", &m_parameters.initialHighFrequencyGain);
             addInput("jitter", &m_parameters.initialJitter);
             addInput("noise", &m_parameters.initialNoise);
+            registerThermalInputs();
 
             ObjectReferenceNode<EngineNode>::registerInputs();
+        }
+
+        void registerThermalInputs() {
+            EngineThermalParameters &thermal = m_parameters.thermalParameters;
+            addInput("thermal_ambient_temperature", &thermal.ambientTemperatureK);
+            addInput("thermal_piston_specific_heat", &thermal.pistonSpecificHeatJPerKgK);
+            addInput("thermal_cylinder_capacity", &thermal.cylinderThermalCapacityJPerK);
+            addInput("thermal_oil_volume", &thermal.oilVolumeM3);
+            addInput("thermal_oil_density", &thermal.oilDensityKgPerM3);
+            addInput("thermal_oil_specific_heat", &thermal.oilSpecificHeatJPerKgK);
+            addInput("thermal_piston_cylinder_conductance", &thermal.pistonCylinderConductanceWPerK);
+            addInput("thermal_piston_oil_conductance", &thermal.pistonOilConductanceWPerK);
+            addInput("thermal_cylinder_oil_conductance", &thermal.cylinderOilConductanceWPerK);
+            addInput("thermal_cylinder_ambient_conductance", &thermal.cylinderAmbientConductanceWPerK);
+            addInput("thermal_oil_ambient_conductance", &thermal.oilAmbientConductanceWPerK);
+            addInput("thermal_piston_friction_fraction", &thermal.pistonFrictionHeatFraction);
+            addInput("thermal_cylinder_friction_fraction", &thermal.cylinderFrictionHeatFraction);
+            addInput("thermal_oil_friction_fraction", &thermal.oilFrictionHeatFraction);
+            addInput("thermal_piston_surface_factor", &thermal.pistonGasSurfaceFactor);
+            addInput("thermal_cylinder_surface_factor", &thermal.cylinderGasSurfaceFactor);
+            addInput("thermal_piston_transfer_factor", &thermal.pistonGasHeatTransferFactor);
+            addInput("thermal_cylinder_transfer_factor", &thermal.cylinderGasHeatTransferFactor);
+            addInput("thermal_hohenberg_coefficient", &thermal.hohenbergCoefficient);
+            addInput("thermal_maximum_transfer_coefficient", &thermal.maximumHeatTransferCoefficientWPerM2K);
+            addInput("thermal_update_interval", &thermal.updateIntervalSeconds);
         }
 
         virtual void _evaluate() {

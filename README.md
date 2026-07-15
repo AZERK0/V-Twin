@@ -32,10 +32,11 @@ Key metrics exposed by the wear dashboard include:
 - detonation reserve
 - remaining useful life
 - damage rate
+- simulated oil, hottest-piston, and hottest-cylinder temperatures
 - accumulated subsystem damage
 - over-rev, over-temp, cold-load, starvation, and knock events
 
-See `ENGINE_WEAR_METRICS.md` for a detailed description of the current model and every displayed metric.
+See `ENGINE_WEAR_METRICS.md` for the displayed metrics and `ENGINE_THERMAL_MODEL.md` for the equations, implementation mapping, assumptions, and current physical limits.
 
 ## Controls
 
@@ -183,7 +184,7 @@ python3 -m tkinter
 - `src/simulation/engine_wear_model.cpp`: wear model implementation
 - `src/ui/engine_wear_cluster.cpp`: wear dashboard rendering
 - `ENGINE_WEAR_METRICS.md`: wear-model metric reference
-- `ENGINE_THERMAL_MODEL.md`: oil, piston, and cylinder thermal-model study
+- `ENGINE_THERMAL_MODEL.md`: oil, piston, and cylinder thermal-model specification and implementation
 - `assets/engines/`: sample engine definitions
 - `launcher_python/`: optional Python launcher GUI
 - `scripts/`: Linux bootstrap, configure, build, test, and run helpers

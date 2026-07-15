@@ -30,7 +30,31 @@ public node harley_davidson_shovelhead {
         hf_gain: 0.01,
         noise: 0.115,
         jitter: 0.136,
-        simulation_frequency: 35000
+        simulation_frequency: 35000,
+        thermal:
+            engine_thermal_parameters(
+                ambient_temperature: 25 * units.C + units.K0,
+                piston_specific_heat: 900 * units.J / (units.kg * units.K),
+                cylinder_thermal_capacity: 2000 * units.J / units.K,
+                oil_volume: 3 * units.L,
+                oil_density: 850 * units.kg / units.m3,
+                oil_specific_heat: 2000 * units.J / (units.kg * units.K),
+                piston_cylinder_conductance: 6 * units.J / (units.sec * units.K),
+                piston_oil_conductance: 8 * units.J / (units.sec * units.K),
+                cylinder_oil_conductance: 10 * units.J / (units.sec * units.K),
+                cylinder_ambient_conductance: 10 * units.J / (units.sec * units.K),
+                oil_ambient_conductance: 5 * units.J / (units.sec * units.K),
+                piston_friction_heat_fraction: 0.35,
+                cylinder_friction_heat_fraction: 0.45,
+                oil_friction_heat_fraction: 0.20,
+                piston_gas_surface_factor: 1.0,
+                cylinder_gas_surface_factor: 1.0,
+                piston_gas_heat_transfer_factor: 1.0,
+                cylinder_gas_heat_transfer_factor: 1.0,
+                hohenberg_coefficient: 130.0,
+                maximum_heat_transfer_coefficient: 5000 * units.J / (units.sec * units.m2 * units.K),
+                update_interval: 0.02 * units.sec
+            )
     )
 
     wires wires()

@@ -104,3 +104,72 @@ TEST(EngineThermalModelTests, RejectsInvalidFrictionHeatFractions) {
     EXPECT_FALSE(model.initialize(parameters, { createCylinderProperties() }));
     EXPECT_FALSE(model.getState().valid);
 }
+
+TEST(EngineThermalModelTests, ClampsOutOfRangeHeatTransferCoefficient) {
+    EngineThermalParameters parameters;
+    CylinderThermalSample sample = createAmbientSample();
+    sample.gasPressurePa = units::pressure(500000.0, units::bar);
+
+    const double coefficient = EngineThermalModel::calculateHohenbergHeatTransferCoefficient(
+        parameters,
+        sample);
+
+    EXPECT_DOUBLE_EQ(coefficient, parameters.maximumHeatTransferCoefficientWPerM2K);
+}
+
+TEST(EngineThermalModelTests, IsIndependentFromFastSampleSubdivision) {
+    EngineThermalModel singleSampleModel;
+    EngineThermalModel subdividedSampleModel;
+    EngineThermalParameters parameters;
+    const CylinderThermalProperties properties = createCylinderProperties();
+    ASSERT_TRUE(singleSampleModel.initialize(parameters, { properties }));
+    ASSERT_TRUE(subdividedSampleModel.initialize(parameters, { properties }));
+
+    CylinderThermalSample sample = createAmbientSample(400.0);
+    sample.gasTemperatureK = 900.0;
+    sample.gasPressurePa = units::pressure(5.0, units::bar);
+    sample.chamberVolumeM3 = 0.0004350;
+    sample.meanPistonSpeedMPerS = 10.795;
+    singleSampleModel.update({ sample }, parameters.updateIntervalSeconds);
+    for (int i = 0; i < 20; ++i) {
+        subdividedSampleModel.update({ sample }, parameters.updateIntervalSeconds / 20.0);
+    }
+
+    const EngineThermalState &singleState = singleSampleModel.getState();
+    const EngineThermalState &subdividedState = subdividedSampleModel.getState();
+    EXPECT_NEAR(singleState.oilTemperatureK, subdividedState.oilTemperatureK, 1e-12);
+    EXPECT_NEAR(
+        singleState.cylinders[0].pistonTemperatureK,
+        subdividedState.cylinders[0].pistonTemperatureK,
+        1e-12);
+    EXPECT_NEAR(
+        singleState.cylinders[0].cylinderTemperatureK,
+        subdividedState.cylinders[0].cylinderTemperatureK,
+        1e-12);
+}
+
+TEST(EngineThermalModelTests, RejectsNumericallyUnstableUpdateInterval) {
+    EngineThermalModel model;
+    EngineThermalParameters parameters;
+    parameters.pistonCylinderConductanceWPerK = 1000000.0;
+
+    EXPECT_FALSE(model.initialize(parameters, { createCylinderProperties() }));
+}
+
+TEST(EngineThermalModelTests, CountsGuardedPhysicalInputs) {
+    EngineThermalModel model;
+    EngineThermalParameters parameters;
+    ASSERT_TRUE(model.initialize(parameters, { createCylinderProperties() }));
+    CylinderThermalSample sample = createAmbientSample();
+    sample.gasTemperatureK = 0.0;
+    sample.gasPressurePa = 0.0;
+    sample.chamberVolumeM3 = 0.0;
+    sample.meanPistonSpeedMPerS = -1.0;
+
+    model.update({ sample }, parameters.updateIntervalSeconds);
+
+    EXPECT_GT(model.getState().inputAnomalyCount, 0u);
+    EXPECT_GT(model.getState().oilTemperatureK, 0.0);
+    EXPECT_GT(model.getState().cylinders[0].pistonTemperatureK, 0.0);
+    EXPECT_GT(model.getState().cylinders[0].cylinderTemperatureK, 0.0);
+}
