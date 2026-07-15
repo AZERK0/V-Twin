@@ -146,7 +146,14 @@ public node t2jz {
         hf_gain: 0.01,
         noise: 1.0,
         jitter: 0.23,
-        simulation_frequency: 10000
+        simulation_frequency: 10000,
+        thermal:
+            engine_thermal_parameters(
+                cylinder_thermal_capacity: 12000 * units.J / units.K,
+                oil_volume: 5.0 * units.L,
+                cylinder_ambient_conductance: 25 * units.J / (units.sec * units.K),
+                oil_ambient_conductance: 100 * units.J / (units.sec * units.K)
+            )
     )
 
     label stroke(86.0 * units.mm)

@@ -954,6 +954,21 @@ $$
 
 Les flux internes s'annulent donc correctement.
 
+### 10.6 Configuration initiale du 2JZ fourni
+
+L'asset `assets/engines/atg-video-2/03_2jz.mr` représente un six-cylindres en ligne refroidi par liquide. Les valeurs par défaut illustratives du V-Twin sous-estiment fortement son inertie et ses rejets thermiques, car les apports piston-huile et cylindre-huile sont additionnés six fois tandis que $G_{oa}$ reste global.
+
+Le manuel Toyota de la Supra indique une capacité d'huile avec filtre de $5{,}2\ \mathrm{L}$ pour le 2JZ-GE et $5{,}0\ \mathrm{L}$ pour le 2JZ-GTE, ainsi qu'une capacité de refroidissement de $8{,}0$ à $8{,}9\ \mathrm{L}$ selon la version. L'asset utilise donc une première configuration effective :
+
+| Paramètre | Valeur | Interprétation V1 |
+|---|---:|---|
+| Volume d'huile | $5{,}0\ \mathrm{L}$ | capacité publiée du 2JZ-GTE avec filtre |
+| $C_c$ | $12\ 000\ \mathrm{J/K}$ par cylindre | part locale du bloc, de la culasse et du liquide absent comme nœud |
+| $G_{ca}$ | $25\ \mathrm{W/K}$ par cylindre | chemin équivalent chemise-culasse-coolant-radiateur |
+| $G_{oa}$ | $100\ \mathrm{W/K}$ global | carter, échangeur d'huile et rejet final équivalents |
+
+Ces trois dernières valeurs ne sont pas des caractéristiques Toyota mesurées. Elles constituent une calibration de première passe destinée à produire une température d'huile de l'ordre de $100$ à $120\ ^\circ\mathrm{C}$ sous une charge comparable au scénario qui divergeait auparavant. Elles devront être identifiées sur des transitoires et points stationnaires mesurés lorsque le régime, le couple, la température d'huile et la température de coolant seront disponibles ensemble.
+
 ## 11. État des étapes d'implémentation
 
 1. Terminé : structure de paramètres thermiques indépendante du modèle d'usure.
@@ -1101,6 +1116,7 @@ Elle ne convient pas seule à :
 6. S. Zoz, S. Strepek, M. Wiseman et C. Qian, « Engine Lubrication System Model for Sump Oil Temperature Prediction », SAE Technical Paper 2001-01-1073. [DOI 10.4271/2001-01-1073](https://saemobilus.sae.org/papers/engine-lubrication-system-model-sump-oil-temperature-prediction-2001-01-1073).
 7. B. Sangeorzan, E. Barber et B. Hinds, « Development of a One-Dimensional Engine Thermal Management Model to Predict Piston and Oil Temperatures », SAE Technical Paper 2011-01-0647. [DOI 10.4271/2011-01-0647](https://saemobilus.sae.org/papers/development-a-one-dimensional-engine-thermal-management-model-predict-piston-oil-temperatures-2011-01-0647).
 8. T. Nomura, K. Matsushita, Y. Fujii et H. Fujiwara, « Development of Temperature Estimation Method of Whole Engine Considering Heat Balance under Vehicle Running Conditions », SAE 2014-32-0050. Cette étude est particulièrement pertinente pour un moteur de moto refroidi par air. [DOI 10.4271/2014-32-0050](https://saemobilus.sae.org/articles/development-temperature-estimation-method-whole-engine-considering-heat-balance-vehicle-running-conditions-2014-32-0050).
+9. Toyota Motor Corporation, *Supra Owner's Manual*, caractéristiques du 2JZ-GE et du 2JZ-GTE, capacités d'huile et de refroidissement, p. 185-186. [Manuel Toyota](https://assets.sia.toyota.com/publications/en/om-s/OM14528U/pdf/OM14528U_edited.pdf).
 
 ## 15. Normes et méthodes d'essai pertinentes
 
