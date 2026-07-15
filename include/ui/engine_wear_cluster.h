@@ -78,7 +78,8 @@ class EngineWearCluster : public UiElement {
         std::string m_confidenceText;
         std::string m_failureModeText;
         std::string m_oilTemperatureText;
-        std::string m_coolantTemperatureText;
+        std::string m_pistonTemperatureText;
+        std::string m_cylinderTemperatureText;
 
         std::string m_thermalMarginText;
         std::string m_lubricationMarginText;

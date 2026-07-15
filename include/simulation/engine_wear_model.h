@@ -25,8 +25,11 @@ struct EngineWearState {
     float remainingUsefulLifeHours = 0.0f;
     float confidence = 1.0f;
 
-    float oilTemperatureC = 90.0f;
-    float coolantTemperatureC = 88.0f;
+    float oilTemperatureC = 25.0f;
+    float averagePistonTemperatureC = 25.0f;
+    float maximumPistonTemperatureC = 25.0f;
+    float averageCylinderTemperatureC = 25.0f;
+    float maximumCylinderTemperatureC = 25.0f;
 
     float thermalMargin = 1.0f;
     float lubricationMargin = 1.0f;
@@ -79,7 +82,10 @@ class EngineWearModel {
         double m_combustionStability;
 
         double m_oilTemperatureC;
-        double m_coolantTemperatureC;
+        double m_averagePistonTemperatureC;
+        double m_maximumPistonTemperatureC;
+        double m_averageCylinderTemperatureC;
+        double m_maximumCylinderTemperatureC;
 
         double m_bottomEndDamage;
         double m_ringSealDamage;

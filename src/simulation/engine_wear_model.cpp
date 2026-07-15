@@ -13,6 +13,11 @@ namespace {
     constexpr double ModelUpdateInterval = 0.02;
     constexpr double SnapshotInterval = 0.1;
     constexpr double StoichAfr = 14.7;
+    constexpr double OilOvertemperatureC = 128.0;
+    constexpr double PistonOvertemperatureC = 260.0;
+    constexpr double CylinderOvertemperatureC = 200.0;
+    constexpr double ThermalCycleHotC = 95.0;
+    constexpr double ThermalCycleColdC = 70.0;
 
     double clampUnit(double value) {
         return std::clamp(value, 0.0, 1.0);
@@ -21,6 +26,26 @@ namespace {
     double smoothValue(double current, double target, double dt, double response) {
         const double alpha = 1.0 - std::exp(-dt * response);
         return current + (target - current) * alpha;
+    }
+
+    double kelvinToCelsius(double temperatureK) {
+        return temperatureK - units::K0;
+    }
+
+    double highTemperaturePenalty(double temperatureC, double thresholdC, double rangeC) {
+        return clampUnit((temperatureC - thresholdC) / rangeC);
+    }
+
+    double calculateThermalTemperaturePenalty(
+        double oilTemperatureC,
+        double pistonTemperatureC,
+        double cylinderTemperatureC)
+    {
+        return std::max({
+            highTemperaturePenalty(oilTemperatureC, 120.0, 30.0),
+            highTemperaturePenalty(pistonTemperatureC, 220.0, 100.0),
+            highTemperaturePenalty(cylinderTemperatureC, 160.0, 80.0)
+        });
     }
 }
 
@@ -46,8 +71,11 @@ void EngineWearModel::reset() {
     m_mechanicalFatigueLoad = 0.22;
     m_combustionStability = 0.91;
 
-    m_oilTemperatureC = 94.0;
-    m_coolantTemperatureC = 88.0;
+    m_oilTemperatureC = 25.0;
+    m_averagePistonTemperatureC = 25.0;
+    m_maximumPistonTemperatureC = 25.0;
+    m_averageCylinderTemperatureC = 25.0;
+    m_maximumCylinderTemperatureC = 25.0;
 
     m_bottomEndDamage = 0.08;
     m_ringSealDamage = 0.05;
@@ -75,7 +103,10 @@ void EngineWearModel::reset() {
 
 void EngineWearModel::update(const Simulator &simulator, double dt) {
     Engine *engine = simulator.getEngine();
-    if (engine == nullptr || engine->getCylinderCount() == 0) {
+    if (engine == nullptr
+        || engine->getCylinderCount() == 0
+        || !simulator.getEngineThermalState().valid)
+    {
         reset();
         return;
     }
@@ -95,6 +126,13 @@ void EngineWearModel::stepModel(const Simulator &simulator, double dt) {
 
     const double dtHours = dt / units::hour;
     m_elapsedHours += dtHours;
+
+    const EngineThermalState &thermalState = simulator.getEngineThermalState();
+    m_oilTemperatureC = kelvinToCelsius(thermalState.oilTemperatureK);
+    m_averagePistonTemperatureC = kelvinToCelsius(thermalState.averagePistonTemperatureK);
+    m_maximumPistonTemperatureC = kelvinToCelsius(thermalState.maximumPistonTemperatureK);
+    m_averageCylinderTemperatureC = kelvinToCelsius(thermalState.averageCylinderTemperatureK);
+    m_maximumCylinderTemperatureC = kelvinToCelsius(thermalState.maximumCylinderTemperatureK);
 
     const double redlineRpm = std::max(units::toRpm(engine->getRedline()), 1000.0);
     const double rpm = engine->getRpm();
@@ -154,18 +192,10 @@ void EngineWearModel::stepModel(const Simulator &simulator, double dt) {
         + 0.18 * rpmLoad
         + 0.18 * manifoldLoad
         + 0.10 * dynoBias);
-    m_coolantTemperatureC = smoothValue(
-        m_coolantTemperatureC,
-        82.0 + 24.0 * thermalSeverity + 6.0 * m_mechanicalFatigueLoad,
-        dt,
-        1.5);
-    m_oilTemperatureC = smoothValue(
+    const double thermalTemperaturePenalty = calculateThermalTemperaturePenalty(
         m_oilTemperatureC,
-        88.0 + 18.0 * thermalSeverity + 22.0 * m_mechanicalFatigueLoad,
-        dt,
-        1.3);
-
-    const double thermalTemperaturePenalty = clampUnit((m_coolantTemperatureC - 96.0) / 18.0);
+        m_maximumPistonTemperatureC,
+        m_maximumCylinderTemperatureC);
     const double thermalMarginTarget = 1.0 - clampUnit(
         0.42 * thermalSeverity
         + 0.33 * thermalTemperaturePenalty
@@ -203,7 +233,10 @@ void EngineWearModel::stepModel(const Simulator &simulator, double dt) {
     if (rpm >= redlineRpm * 0.98) {
         m_overRevSeconds += dt;
     }
-    if (m_coolantTemperatureC >= 108.0 || m_oilTemperatureC >= 128.0) {
+    if (m_oilTemperatureC >= OilOvertemperatureC
+        || m_maximumPistonTemperatureC >= PistonOvertemperatureC
+        || m_maximumCylinderTemperatureC >= CylinderOvertemperatureC)
+    {
         m_overTempSeconds += dt;
     }
     if (m_oilTemperatureC < 70.0 && throttle > 0.65 && rpmLoad > 0.45) {
@@ -219,11 +252,11 @@ void EngineWearModel::stepModel(const Simulator &simulator, double dt) {
     }
     m_knockEventActive = severeKnock;
 
-    if (m_thermalCycleArmed && m_coolantTemperatureC >= 95.0) {
+    if (m_thermalCycleArmed && m_maximumCylinderTemperatureC >= ThermalCycleHotC) {
         ++m_thermalCycles;
         m_thermalCycleArmed = false;
     }
-    else if (!m_thermalCycleArmed && m_coolantTemperatureC <= 70.0) {
+    else if (!m_thermalCycleArmed && m_maximumCylinderTemperatureC <= ThermalCycleColdC) {
         m_thermalCycleArmed = true;
     }
 
@@ -302,7 +335,10 @@ void EngineWearModel::publishSnapshot() {
     m_state.remainingUsefulLifeHours = static_cast<float>((effectiveRate > 1e-5) ? health / effectiveRate : 5000.0);
     m_state.confidence = 1.0f;
     m_state.oilTemperatureC = static_cast<float>(m_oilTemperatureC);
-    m_state.coolantTemperatureC = static_cast<float>(m_coolantTemperatureC);
+    m_state.averagePistonTemperatureC = static_cast<float>(m_averagePistonTemperatureC);
+    m_state.maximumPistonTemperatureC = static_cast<float>(m_maximumPistonTemperatureC);
+    m_state.averageCylinderTemperatureC = static_cast<float>(m_averageCylinderTemperatureC);
+    m_state.maximumCylinderTemperatureC = static_cast<float>(m_maximumCylinderTemperatureC);
     m_state.thermalMargin = static_cast<float>(clampUnit(m_thermalMargin));
     m_state.lubricationMargin = static_cast<float>(clampUnit(m_lubricationMargin));
     m_state.detonationMargin = static_cast<float>(clampUnit(m_detonationMargin));

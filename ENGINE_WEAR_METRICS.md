@@ -1,13 +1,15 @@
 # Engine Wear Metrics
 
-This document explains the engine wear metrics currently exposed by the fake-data wear model.
+This document explains the engine wear metrics currently exposed by the simulation-driven wear model.
 
-The current implementation is fake-data driven, but each metric is intentionally designed to map to a future real-world signal, estimation, or degradation model.
+Oil, piston, and cylinder temperatures now come from the lumped thermal observer described in `ENGINE_THERMAL_MODEL.md`. The remaining lifetime, margin, and accumulated-damage outputs are engineering estimators that still require calibration against measurements.
 
 Relevant code:
 
 - `include/simulation/engine_wear_model.h`
 - `src/simulation/engine_wear_model.cpp`
+- `include/simulation/engine_thermal_model.h`
+- `src/simulation/engine_thermal_model.cpp`
 - `include/ui/engine_wear_cluster.h`
 - `src/ui/engine_wear_cluster.cpp`
 
@@ -44,11 +46,13 @@ The metrics are grouped into four engineering questions:
 - Interpretation:
   - high = thermal operating point is healthy
   - low = chamber temperature, pressure, rpm, and cooling stress are converging toward risk
-- Future real mapping:
-  - coolant temp
-  - oil temp
-  - cylinder temp estimate
-  - thermal gradients / hot spots
+- Current thermal inputs:
+  - simulated mean oil temperature
+  - simulated maximum piston temperature
+  - simulated maximum cylinder temperature
+- Not modeled yet:
+  - coolant temperature
+  - thermal gradients and local hot spots
 
 ### Lube Res
 
@@ -134,9 +138,12 @@ The model picks the dominant mode from a set of weighted scores combining instan
 - Meaning: subsystem or operating dimension with the strongest current stress contribution
 - Purpose: tells you what is currently attacking durability the hardest
 
-### Oil Temp / Coolant
+### Oil Temp / Piston Max / Cyl Max
 
-- Meaning: current modeled temperatures used by the wear system
+- Meaning: physical temperatures published by the thermal observer and used by the wear system
+- `Oil Temp`: mean temperature of the global, perfectly mixed oil node
+- `Piston Max`: highest mean piston temperature among the simulated cylinders
+- `Cyl Max`: highest mean liner/cylinder temperature among the simulated cylinders
 - Purpose: quick thermal context for the focus diagnosis
 
 ## Operating Margins
@@ -232,7 +239,7 @@ This block captures operating history that explains why wear is accumulating.
 
 ### Overtemp
 
-- Meaning: cumulative time above critical oil or coolant thresholds
+- Meaning: cumulative time above critical oil, piston, or cylinder thresholds
 - Why it matters: increases thermal degradation and head/gasket risk
 
 ### Cold Load
@@ -255,9 +262,9 @@ This block captures operating history that explains why wear is accumulating.
 - Meaning: count of thermal cycles detected by the wear model
 - Why it matters: thermal cycling is relevant to long-term fatigue, sealing integrity, and structural durability
 
-## How the current fake model works
+## How the current model works
 
-The current fake-data model is still physically inspired. It is not random UI noise.
+The model combines a physical thermal observer with heuristic wear and durability estimators.
 
 It uses live simulation signals such as:
 
@@ -267,8 +274,16 @@ It uses live simulation signals such as:
 - intake AFR
 - per-cylinder pressure
 - per-cylinder temperature
-- chamber friction force
+- chamber friction force and applied friction power
 - dyno load bias
+
+The thermal observer additionally uses:
+
+- piston mass and cylinder bore
+- instantaneous gas pressure, temperature, and chamber volume
+- mean piston speed
+- Hohenberg gas-wall heat transfer
+- calibrated thermal capacities and conductances
 
 From those signals it builds:
 
@@ -303,7 +318,10 @@ This gives a practical workflow:
 
 ## Current limitations
 
-- all metrics are still fake-data outputs
+- oil, piston, and cylinder outputs are simulated temperatures, not fake UI values
+- wear margins, damage rates, accumulated damage, and RUL remain uncalibrated estimators
+- the thermal model is a one-way observer and does not yet replace the fixed gas-wall boundary condition
+- coolant is not simulated because the current V-Twin model has no coolant circuit
 - `Confidence` is currently fixed to `100%`
 - `RUL` is a model projection, not a validated lifetime estimator
 - thresholds and weights are placeholders intended to be replaced or calibrated later

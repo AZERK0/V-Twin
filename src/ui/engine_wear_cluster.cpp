@@ -123,8 +123,9 @@ EngineWearCluster::EngineWearCluster() {
     m_rulText = "999+h";
     m_confidenceText = "100%";
     m_failureModeText = "BALANCED";
-    m_oilTemperatureText = "90C";
-    m_coolantTemperatureText = "88C";
+    m_oilTemperatureText = "25C";
+    m_pistonTemperatureText = "25C";
+    m_cylinderTemperatureText = "25C";
 
     m_thermalMarginText = "100%";
     m_lubricationMarginText = "100%";
@@ -242,7 +243,8 @@ void EngineWearCluster::refreshCachedStrings() {
     m_confidenceText = formatPercent(m_state.confidence);
     m_failureModeText = getFailureModeLabel(m_state.dominantFailureMode);
     m_oilTemperatureText = formatTemperature(m_state.oilTemperatureC);
-    m_coolantTemperatureText = formatTemperature(m_state.coolantTemperatureC);
+    m_pistonTemperatureText = formatTemperature(m_state.maximumPistonTemperatureC);
+    m_cylinderTemperatureText = formatTemperature(m_state.maximumCylinderTemperatureC);
 
     m_thermalMarginText = formatPercent(m_state.thermalMargin);
     m_lubricationMarginText = formatPercent(m_state.lubricationMargin);
@@ -389,12 +391,13 @@ void EngineWearCluster::renderOverviewPanel(const Bounds &bounds) {
     drawAlignedText(m_failureModeText, bounds.verticalSplit(0.64f, 0.82f), modeSize, Bounds::center, Bounds::center);
     drawAlignedText(getFailureModeAction(m_state.dominantFailureMode), bounds.verticalSplit(0.50f, 0.60f), bodySize, Bounds::center, Bounds::center);
 
-    Grid infoGrid{ 1, 4 };
-    const Bounds rows = bounds.verticalSplit(0.0f, 0.42f);
-    drawInfoRow(infoGrid.get(rows, 0, 3), "TOP DAMAGE", getTopDamageLabel(), bodySize);
-    drawInfoRow(infoGrid.get(rows, 0, 2), "TOP STRESS", getTopStressLabel(), bodySize);
-    drawInfoRow(infoGrid.get(rows, 0, 1), "OIL TEMP", m_oilTemperatureText, bodySize);
-    drawInfoRow(infoGrid.get(rows, 0, 0), "COOLANT", m_coolantTemperatureText, bodySize);
+    Grid infoGrid{ 1, 5 };
+    const Bounds rows = bounds.verticalSplit(0.0f, 0.44f);
+    drawInfoRow(infoGrid.get(rows, 0, 4), "TOP DAMAGE", getTopDamageLabel(), bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 3), "TOP STRESS", getTopStressLabel(), bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 2), "OIL TEMP", m_oilTemperatureText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 1), "PISTON MAX", m_pistonTemperatureText, bodySize);
+    drawInfoRow(infoGrid.get(rows, 0, 0), "CYL MAX", m_cylinderTemperatureText, bodySize);
 }
 
 void EngineWearCluster::renderExposurePanel(const Bounds &bounds) {
