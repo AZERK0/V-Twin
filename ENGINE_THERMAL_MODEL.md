@@ -18,7 +18,7 @@ Le modèle proposé est une **première version d'estimation**, adaptée à un s
 
 ### 1.1 État de l'implémentation
 
-La V1 décrite dans ce document est active dans la codebase :
+La V1 décrite dans ce document est active dans la codebase. La section 17 constitue la spécification normative de la V2 avant son implémentation :
 
 - `EngineThermalParameters` porte une configuration thermique indépendante ;
 - `EngineThermalModel` accumule les flux à chaque sous-pas fluide et intègre le réseau à $50\ \mathrm{Hz}$ par défaut ;
@@ -27,6 +27,7 @@ La V1 décrite dans ce document est active dans la codebase :
 - `EngineConditionModel` publie les températures calculées avec la télémétrie opérationnelle réelle ;
 - `EngineConditionCluster` affiche de grandes jauges et une carte thermique par cylindre ;
 - `engine_thermal_parameters` expose les constantes dans les fichiers `.mr` sans imposer de modification aux assets existants.
+- la V2 sépare le carter, le refroidisseur d'huile et le coolant, puis impose un bilan de puissance observable.
 
 L'asset Harley de référence déclare explicitement les valeurs illustratives de la section 10. Les autres moteurs héritent actuellement des mêmes valeurs par défaut : cela assure leur compatibilité, mais ne constitue pas une calibration physique de ces moteurs.
 
@@ -1071,3 +1072,319 @@ Le modèle minimal retenu est donc :
 - couplage retour vers les gaz reporté après calibration.
 
 Cette solution est compatible avec les pièces et signaux actuels. Ses principales inconnues ne nécessitent pas de nouvelles pièces simulées, mais des paramètres thermiques explicites : capacités, volume d'huile, propriétés des matériaux et conductances de refroidissement.
+
+## 17. Spécification V2 : circuit de refroidissement et bilan énergétique instrumenté
+
+Cette section définit l'extension à implémenter avant toute nouvelle calibration du 2JZ. Elle remplace l'interprétation d'une conductance unique huile-ambiance par des chemins physiques séparés, tout en conservant la compatibilité des moteurs V1 qui ne déclarent pas ces nouveaux paramètres.
+
+Les travaux de Zoz et al. distinguent explicitement les échanges de l'huile avec la combustion, le coolant et l'air du compartiment moteur. Sangeorzan et al. montrent qu'un modèle 1D calibré peut reproduire conjointement les températures d'huile, de coolant et de piston. Nomura et al. soulignent que les conditions de roulage et l'écoulement autour du moteur doivent faire partie du bilan pour prédire une température sous véhicule complet. La V2 adopte cette topologie, sans prétendre remplacer leurs modèles de circulation détaillés.
+
+### 17.1 Vecteur d'état étendu
+
+Le vecteur thermique devient :
+
+$$
+\mathbf T=\left[
+T_o,T_s,T_w,
+T_{p,1},\ldots,T_{p,N_c},
+T_{c,1},\ldots,T_{c,N_c}
+\right]^T
+$$
+
+avec :
+
+- $T_o$ : température moyenne de l'huile circulante et du volume de carter ;
+- $T_s$ : température moyenne de la paroi métallique du carter inférieur ;
+- $T_w$ : température moyenne du circuit de coolant ;
+- $T_{p,i}$ : température moyenne du piston $i$ ;
+- $T_{c,i}$ : température moyenne du liner et de la masse locale du bloc.
+
+$T_s$ et $T_w$ sont optionnels. Une capacité nulle désactive le nœud et tous les chemins qui lui sont associés doivent alors être nuls. Cela permet aux moteurs existants de conserver le réseau V1 sans configuration obligatoire.
+
+Le refroidisseur d'huile air-huile est traité comme un échangeur quasi stationnaire : sa faible inertie propre n'ajoute pas de température d'état. Son influence apparaît sous la forme d'un $UA$ distinct, commandé par un thermostat d'huile.
+
+```mermaid
+flowchart LR
+    G["Gaz Tg,i"] --> P["Piston Tp,i"]
+    G --> C["Cylindre Tc,i"]
+    P <--> C
+    P --> O["Huile To"]
+    C <--> O
+    C --> W["Coolant Tw"]
+    O <--> W
+    O --> S["Carter Ts"]
+    S --> A["Air ambiant Ta"]
+    O --> OC["Refroidisseur d'huile"]
+    OC --> A
+    W --> R["Radiateur + thermostat"]
+    R --> A
+    C --> A
+```
+
+### 17.2 Entrées lentes de roulage
+
+Le réseau reçoit, en plus des échantillons par cylindre :
+
+$$
+\mathcal O=\left(v_{veh},\omega_e\right)
+$$
+
+où $v_{veh}$ est la vitesse véhicule en $\mathrm{m\,s^{-1}}$ et $\omega_e$ le régime moteur en $\mathrm{rad\,s^{-1}}$. Les valeurs absolues sont utilisées pour le refroidissement et les pompes. Une marche arrière ne doit pas créer une conductance négative.
+
+Ces entrées varient lentement devant le cycle moteur. Elles peuvent être moyennées sur le pas thermique de $20\ \mathrm{ms}$, alors que les flux gaz-paroi et le frottement restent intégrés à chaque sous-pas fluide.
+
+### 17.3 Loi de convection dépendante de la vitesse
+
+Pour chaque échangeur air $x$, la conductance effective est :
+
+$$
+G_x(v)=G_{x,nat}+G_{x,ref}
+\left(\frac{\min(|v|,v_{max})}{v_{ref}}\right)^{n_v}
+$$
+
+où :
+
+- $G_{x,nat}$ représente la convection naturelle et le rayonnement linéarisé ;
+- $G_{x,ref}$ est l'incrément de conductance forcée à $v_{ref}$ ;
+- $n_v$ est un exposant empirique, généralement compris entre $0{,}5$ et $0{,}8$ pour une convection externe ;
+- $v_{max}$ empêche une extrapolation sans borne hors du domaine calibré.
+
+Paramétrer $G_{x,ref}$ plutôt qu'une constante dimensionnée $k_v$ rend la configuration lisible et vérifiable : à $v=v_{ref}$, la contribution forcée vaut exactement $G_{x,ref}$.
+
+Cette loi est appliquée séparément :
+
+- au carter vers l'air, avec la vitesse véhicule ;
+- au refroidisseur d'huile vers l'air, avec la vitesse véhicule ;
+- au refroidissement direct des cylindres d'un moteur refroidi par air ;
+- au radiateur de coolant, avec une vitesse d'air combinant roulage et ventilateur.
+
+La vitesse d'air effective du radiateur est :
+
+$$
+v_{rad}=\sqrt{(k_{ram}|v_{veh}|)^2+(D_fv_{fan,max})^2}
+$$
+
+La somme quadratique évite d'additionner intégralement deux écoulements qui ne sont ni colinéaires ni indépendants. $k_{ram}$ représente la récupération de pression dynamique et le masquage de la face avant.
+
+### 17.4 Thermostats et ventilateur
+
+La fonction de transition commune est :
+
+$$
+S(x)=
+\begin{cases}
+0 & x\le 0\\
+x^2(3-2x) & 0<x<1\\
+1 & x\ge 1
+\end{cases}
+$$
+
+L'ouverture du thermostat de coolant vaut :
+
+$$
+\xi_w=S\left(\frac{T_w-T_{w,start}}{T_{w,full}-T_{w,start}}\right)
+$$
+
+L'ouverture du thermostat d'huile vaut :
+
+$$
+\xi_o=S\left(\frac{T_o-T_{o,start}}{T_{o,full}-T_{o,start}}\right)
+$$
+
+La commande du ventilateur est :
+
+$$
+D_f=S\left(\frac{T_w-T_{fan,on}}{T_{fan,full}-T_{fan,on}}\right)
+$$
+
+Ces lois continues évitent une discontinuité numérique au seuil. Elles ne reproduisent pas l'hystérésis d'un relais réel ; celle-ci pourra être ajoutée lorsque le modèle conservera un état de commande discret.
+
+Les rejets des échangeurs deviennent :
+
+$$
+\dot Q_{rad\rightarrow a}=\xi_wG_{rad}(v_{rad})(T_w-T_a)
+$$
+
+$$
+\dot Q_{oc\rightarrow a}=\xi_oG_{oc}(|v_{veh}|)(T_o-T_a)
+$$
+
+### 17.5 Pompes dépendantes du régime
+
+Le facteur d'une pompe est :
+
+$$
+\phi_p(\omega_e)=\operatorname{clamp}\left[
+\left(\frac{|\omega_e|}{\omega_{p,ref}}\right)^{n_p},
+\phi_{p,min},\phi_{p,max}
+\right]
+$$
+
+La borne basse représente la circulation résiduelle retenue par le modèle concentré ; elle doit être nulle si aucune circulation n'est souhaitée moteur arrêté. La borne haute évite d'extrapoler une pompe volumétrique et ses pertes de charge au-delà du domaine calibré.
+
+Les conductances côté fluides sont :
+
+$$
+G_{cw}=G_{cw,stat}+G_{cw,pump}\phi_w
+$$
+
+$$
+G_{ow}=G_{ow,stat}+G_{ow,pump}\sqrt{\phi_o\phi_w}
+$$
+
+La moyenne géométrique du chemin huile-coolant impose qu'une baisse de l'une des deux circulations pénalise l'échangeur. Ces relations sont des lois réduites de $UA$, pas des calculs de débit hydraulique ou de perte de charge.
+
+### 17.6 Bilans des nouveaux nœuds
+
+Le bilan du piston conserve la forme V1 :
+
+$$
+C_{p,i}\dot T_{p,i}=\dot Q_{g\rightarrow p,i}+\alpha_pP_{f,i}
+-G_{pc}(T_{p,i}-T_{c,i})-G_{po}(T_{p,i}-T_o)
+$$
+
+Le bilan du cylindre devient :
+
+$$
+\begin{aligned}
+C_{c,i}\dot T_{c,i}={}&\dot Q_{g\rightarrow c,i}+\alpha_cP_{f,i}
++G_{pc}(T_{p,i}-T_{c,i})\\
+&-G_{co}(T_{c,i}-T_o)
+-G_{ca}(v_{veh})(T_{c,i}-T_a)
+-G_{cw}(\omega_e)(T_{c,i}-T_w)
+\end{aligned}
+$$
+
+Le bilan d'huile devient :
+
+$$
+\begin{aligned}
+C_o\dot T_o={}&\sum_i\left[
+G_{po}(T_{p,i}-T_o)+G_{co}(T_{c,i}-T_o)+\alpha_oP_{f,i}
+\right]\\
+&-G_{os}(T_o-T_s)
+-G_{ow}(\omega_e)(T_o-T_w)
+-\xi_oG_{oc}(v_{veh})(T_o-T_a)
+-G_{oa,legacy}(T_o-T_a)
+\end{aligned}
+$$
+
+Le bilan du carter est :
+
+$$
+C_s\dot T_s=G_{os}(T_o-T_s)-G_{sa}(v_{veh})(T_s-T_a)
+$$
+
+Le bilan du coolant est :
+
+$$
+C_w\dot T_w=\sum_iG_{cw}(T_{c,i}-T_w)
++G_{ow}(T_o-T_w)
+-\xi_wG_{rad}(v_{rad})(T_w-T_a)
+$$
+
+Tous les flux internes peuvent changer de signe. Par exemple, pendant la chauffe, le coolant peut réchauffer l'huile à travers un échangeur eau-huile ; le code ne doit pas écrêter ce comportement.
+
+### 17.7 Bilan global et métriques obligatoires
+
+Le snapshot doit publier au minimum :
+
+- puissance gaz vers pistons et cylindres ;
+- puissance totale de frottement et répartition par nœud ;
+- puissance piston vers huile ;
+- puissance cylindre vers huile ;
+- puissance cylindre vers coolant ;
+- puissance huile vers carter ;
+- puissance huile vers coolant ;
+- rejet du carter vers l'air ;
+- rejet du refroidisseur d'huile vers l'air ;
+- rejet du radiateur vers l'air ;
+- puissances de stockage de chaque famille de nœuds ;
+- résidu énergétique global.
+
+Le rejet total vers l'ambiance est :
+
+$$
+\dot Q_{rej}=\sum_i\dot Q_{c_i\rightarrow a}
++\dot Q_{s\rightarrow a}
++\dot Q_{oc\rightarrow a}
++\dot Q_{rad\rightarrow a}
++\dot Q_{o\rightarrow a,legacy}
+$$
+
+Le résidu publié est :
+
+$$
+r_E=\dot U_{stockee}
+-\left[
+\sum_i(\dot Q_{g\rightarrow p,i}+\dot Q_{g\rightarrow c,i}+P_{f,i})
+-\dot Q_{rej}
+\right]
+$$
+
+Les flux internes sont absents du terme de droite parce qu'ils doivent s'annuler deux à deux. Le critère numérique est :
+
+$$
+\varepsilon_E=\frac{|r_E|}{\max(1\ \mathrm{W},|\dot Q_{entree}|+|\dot Q_{rej}|)}
+$$
+
+La métrique est valide si $\varepsilon_E<10^{-9}$ pour un pas accepté. Une violation incrémente le compteur d'anomalies au lieu de publier silencieusement un bilan incohérent.
+
+### 17.8 Stabilité numérique étendue
+
+La condition d'Euler doit désormais être vérifiée pour l'ensemble des nœuds :
+
+$$
+\Delta t<\min_j\frac{2C_j}{\sum_kG_{jk,max}}
+$$
+
+Les conductances maximales utilisent $v_{max}$, $\phi_{p,max}$ et des thermostats totalement ouverts. Une configuration stable à l'arrêt peut devenir instable à haute vitesse si cette vérification utilise seulement les conductances instantanées.
+
+### 17.9 Méthode de calibration du 2JZ
+
+La calibration ne doit pas chercher simultanément toutes les constantes sur une unique température d'huile. L'ordre d'identification est :
+
+1. **Frottement motored ou fuel-cut** : identifier $\mu$ et $c_v$ avec une courbe de FMEP ou de couple résistant en fonction du régime.
+2. **Capacités thermiques** : identifier $C_o$, $C_s$, $C_w$ et les capacités métalliques sur les constantes de temps de chauffe et de refroidissement.
+3. **Circuit coolant** : identifier $G_{cw}$ et $G_{rad}$ sur des mesures de températures bloc, sortie moteur et radiateur, avec plusieurs vitesses véhicule et états de ventilateur.
+4. **Circuit d'huile** : identifier $G_{po}$, $G_{co}$, $G_{os}$, $G_{ow}$ et $G_{oc}$ sur les températures d'huile, de coolant et de carter.
+5. **Transfert gaz-paroi** : seulement ensuite ajuster $k_{g,p}$ et $k_{g,c}$ sur des points fired à charge connue.
+
+Pour un moteur quatre temps de cylindrée $V_d$, la puissance de frottement et la FMEP sont liées par :
+
+$$
+P_f=FMEP\,V_d\frac{N}{120}
+$$
+
+$$
+FMEP=\frac{120P_f}{V_dN}
+$$
+
+avec $N$ en tr/min. Cette métrique permet de détecter une croissance irréaliste du terme visqueux avant de compenser artificiellement par un radiateur surdimensionné.
+
+Les points minimaux de calibration et validation sont :
+
+| Point | Régime et charge | Vitesse véhicule | Objectif principal |
+|---|---|---:|---|
+| ralenti stabilisé | faible charge | $0$ | convection naturelle, thermostat, ventilateur |
+| croisière | charge partielle | vitesse routière | carter, radiateur et échangeur en air forcé |
+| haut régime motored/fuel-cut | sans combustion | $0$ puis route | frottement et pompes |
+| pleine charge stabilisée | plusieurs régimes | $0$ sur banc | transfert gaz-paroi et capacité de rejet |
+| pleine charge sous véhicule | haut régime | vitesse routière | validation globale hors point d'identification |
+
+Sans données mesurées, la configuration fournie reste une calibration d'ingénierie bornée. Elle doit afficher ses flux et son résidu, et ne doit pas être qualifiée de validation du moteur Toyota réel.
+
+### 17.10 Critères d'acceptation de l'implémentation
+
+L'implémentation V2 est acceptée lorsque :
+
+1. deux simulations ayant les mêmes entrées gaz et frottement, mais des vitesses véhicule différentes, produisent des rejets air différents ;
+2. le refroidissement reste non nul à l'arrêt grâce aux termes naturels ou au ventilateur ;
+3. les thermostats sont fermés sous leur seuil et continus dans leur plage d'ouverture ;
+4. les conductances de circulation augmentent avec le régime jusqu'à leur borne ;
+5. le carter et le coolant possèdent leur propre inertie ;
+6. le résidu énergétique satisfait le seuil relatif ;
+7. la subdivision du pas rapide ne modifie pas sensiblement les températures ;
+8. les moteurs sans configuration V2 conservent le comportement V1 ;
+9. le tableau de condition expose les flux nécessaires pour diagnostiquer une température élevée ;
+10. la calibration du 2JZ est vérifiée sur les cinq familles de points précédentes ou explicitement marquée non validée lorsque les mesures manquent.
