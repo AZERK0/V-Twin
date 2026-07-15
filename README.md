@@ -183,6 +183,7 @@ python3 -m tkinter
 - `src/simulation/engine_wear_model.cpp`: wear model implementation
 - `src/ui/engine_wear_cluster.cpp`: wear dashboard rendering
 - `ENGINE_WEAR_METRICS.md`: wear-model metric reference
+- `ENGINE_THERMAL_MODEL.md`: oil, piston, and cylinder thermal-model study
 - `assets/engines/`: sample engine definitions
 - `launcher_python/`: optional Python launcher GUI
 - `scripts/`: Linux bootstrap, configure, build, test, and run helpers
