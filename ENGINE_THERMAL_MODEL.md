@@ -5,43 +5,48 @@
 Ce document décrit les calculs nécessaires pour estimer, dans V-Twin :
 
 - la température moyenne de l'huile, notée $T_o$ ;
+- la température moyenne du carter inférieur, notée $T_s$ ;
+- la température moyenne du coolant, notée $T_w$ ;
 - la température moyenne de chaque piston, notée $T_{p,i}$ ;
 - la température moyenne de la paroi de chaque cylindre, notée $T_{c,i}$.
 
 Il s'appuie sur les signaux réellement disponibles dans la codebase. Il distingue volontairement :
 
 1. la température thermodynamique des gaz déjà calculée par le simulateur ;
-2. le modèle thermique physique concentré désormais implémenté comme première version ;
+2. le modèle thermique physique concentré V2 désormais implémenté ;
 3. le snapshot de condition qui transmet ces résultats à l'interface sans les recalculer.
 
 Le modèle proposé est une **première version d'estimation**, adaptée à un simulateur temps réel. Il ne constitue ni un calcul de dimensionnement, ni un modèle éléments finis, ni une validation d'un moteur réel. Ses paramètres doivent être calibrés pour chaque moteur.
 
 ### 1.1 État de l'implémentation
 
-La V1 décrite dans ce document est active dans la codebase. La section 17 constitue la spécification normative de la V2 avant son implémentation :
+La V2 décrite dans la section 17 est active dans la codebase. La V1 reste le mode de compatibilité des moteurs qui ne déclarent ni carter ni circuit de coolant :
 
 - `EngineThermalParameters` porte une configuration thermique indépendante ;
 - `EngineThermalModel` accumule les flux à chaque sous-pas fluide et intègre le réseau à $50\ \mathrm{Hz}$ par défaut ;
-- `EngineThermalState` publie les températures par cylindre, les moyennes et les maxima ;
+- `EngineCoolingModel` calcule les thermostats, le ventilateur, les pompes et les conductances dépendantes de la vitesse ;
+- `EngineThermalState` publie les températures, les états de refroidissement et le bilan de puissance instantané ;
 - `Simulator` construit les propriétés thermiques à partir des pistons, bancs et culasses réellement chargés ;
 - `EngineConditionModel` publie les températures calculées avec la télémétrie opérationnelle réelle ;
-- `EngineConditionCluster` affiche de grandes jauges et une carte thermique par cylindre ;
-- `engine_thermal_parameters` expose les constantes dans les fichiers `.mr` sans imposer de modification aux assets existants.
-- la V2 sépare le carter, le refroidisseur d'huile et le coolant, puis impose un bilan de puissance observable.
+- `EngineConditionCluster` affiche les jauges, la carte par cylindre, le bilan de puissance et les commandes du refroidissement ;
+- `engine_thermal_parameters` expose les capacités, conductances, seuils et lois réduites dans les fichiers `.mr` ;
+- le carter, le refroidisseur d'huile et le coolant sont des chemins distincts, avec un résidu énergétique vérifié à chaque intégration.
 
-L'asset Harley de référence déclare explicitement les valeurs illustratives de la section 10. Les autres moteurs héritent actuellement des mêmes valeurs par défaut : cela assure leur compatibilité, mais ne constitue pas une calibration physique de ces moteurs.
+L'asset 2JZ déclare la configuration V2 détaillée en section 10.6. Les moteurs non migrés conservent les valeurs V1 : cela assure leur compatibilité, mais ne constitue pas une calibration physique de ces moteurs.
 
 ## 2. Résultat principal de l'étude
 
 Une première version est réalisable avec les informations actuelles, sans ajouter de nouvelles pièces mécaniques à la simulation.
 
-Le périmètre thermique minimal recommandé comprend :
+Le périmètre thermique actif comprend :
 
 - un nœud thermique global pour l'huile ;
+- un nœud optionnel pour le carter inférieur ;
+- un nœud optionnel pour le coolant ;
 - un nœud thermique par piston ;
 - un nœud thermique par cylindre ;
 - la température des gaz de chaque chambre comme source thermique déjà existante ;
-- l'air ambiant comme condition limite de refroidissement.
+- l'air ambiant comme condition limite, modulée par la vitesse du véhicule et le ventilateur.
 
 Les échanges sont représentés par un réseau de capacités et de conductances thermiques :
 
@@ -52,8 +57,13 @@ flowchart LR
     P <-->|"conduction Gpc"| C
     P -->|"convection Gpo"| O["Huile To"]
     C -->|"convection Gco"| O
-    C -->|"refroidissement Gca"| A["Air ambiant Ta"]
-    O -->|"carter / radiateur Goa"| A
+    C -->|"refroidissement direct Gca(v)"| A["Air ambiant Ta"]
+    C -->|"Gcw(omega)"| W["Coolant Tw"]
+    O -->|"Gow(omega)"| W
+    O -->|"Gos"| S["Carter Ts"]
+    S -->|"Gsa(v)"| A
+    O -->|"thermostat + Goc(v)"| A
+    W -->|"thermostat + Grad(v, fan)"| A
     F["Frottement piston-cylindre"] --> P
     F --> C
     F --> O
@@ -72,7 +82,7 @@ Cette représentation produit des températures moyennes, suffisamment utiles po
 | Cylindre | Géométrie portée par `CylinderBank` | alésage, hauteur de deck, orientation, nombre de cylindres |
 | Frottement piston-cylindre | Modèle de Coulomb, Stribeck et viscosité | force de frottement et vitesse instantanée du piston |
 | Huile | Un nœud thermique global, sans circuit hydraulique | volume, densité, capacité calorifique, température moyenne |
-| Refroidissement | Conductances équivalentes vers l'air ambiant | $G_{ca}$ pour les cylindres et $G_{oa}$ pour l'huile |
+| Refroidissement | Réseau concentré configurable | carter, coolant, échangeur huile-air, radiateur, thermostats, ventilateur et facteurs de pompe |
 
 Les principaux fichiers concernés sont :
 
@@ -207,7 +217,7 @@ $$
 
 Les anciennes températures cibles, marges normalisées, dommages cumulés, modes de défaillance et projections de durée de vie ont été supprimés. Ils combinaient des pondérations non calibrées et des constantes de temps beaucoup plus courtes qu'une chauffe réelle. Ils pouvaient donc ressembler à des mesures sans avoir de bilan d'énergie ni de données d'essai pour les valider.
 
-La source de vérité thermique est désormais exclusivement `EngineThermalState`. `EngineConditionState` transmet ces valeurs avec les signaux opérationnels directs. Tant qu'un modèle d'usure calibré n'existe pas, l'interface affiche `WEAR / RUL: NOT CALIBRATED` au lieu de générer un indicateur dynamique.
+La source de vérité thermique est désormais exclusivement `EngineThermalState`. `EngineConditionState` transmet ces valeurs avec les signaux opérationnels directs. Tant qu'un modèle d'usure calibré n'existe pas, l'interface se limite aux températures, flux, commandes et diagnostics physiques ; elle ne génère aucun dommage ni RUL dynamique.
 
 ## 4. Périmètre thermique recommandé pour la V1
 
@@ -879,32 +889,51 @@ $$
 
 Les flux internes s'annulent donc correctement.
 
-### 10.6 Configuration initiale du 2JZ fourni
+### 10.6 Configuration V2 du 2JZ fourni
 
-L'asset `assets/engines/atg-video-2/03_2jz.mr` représente un six-cylindres en ligne refroidi par liquide. Les valeurs par défaut illustratives du V-Twin sous-estiment fortement son inertie et ses rejets thermiques, car les apports piston-huile et cylindre-huile sont additionnés six fois tandis que $G_{oa}$ reste global.
+L'asset `assets/engines/atg-video-2/03_2jz.mr` représente un six-cylindres en ligne refroidi par liquide. Les anciennes valeurs V1 sous-estimaient fortement son inertie et regroupaient le carter, le coolant et les échangeurs dans deux conductances constantes. Cette topologie ne pouvait pas reproduire la différence entre un arrêt, un roulage à $105\ \mathrm{mph}$ et l'action du ventilateur.
 
-Le manuel Toyota de la Supra indique une capacité d'huile avec filtre de $5{,}2\ \mathrm{L}$ pour le 2JZ-GE et $5{,}0\ \mathrm{L}$ pour le 2JZ-GTE, ainsi qu'une capacité de refroidissement de $8{,}0$ à $8{,}9\ \mathrm{L}$ selon la version. L'asset utilise donc une première configuration effective :
+Le manuel Toyota de la Supra indique une capacité d'huile avec filtre de $5{,}2\ \mathrm{L}$ pour le 2JZ-GE et $5{,}0\ \mathrm{L}$ pour le 2JZ-GTE, ainsi qu'une capacité de refroidissement de $8{,}0$ à $8{,}9\ \mathrm{L}$ selon la version. L'asset utilise la configuration effective suivante :
 
-| Paramètre | Valeur | Interprétation V1 |
-|---|---:|---|
-| Volume d'huile | $5{,}0\ \mathrm{L}$ | capacité publiée du 2JZ-GTE avec filtre |
-| $C_c$ | $12\ 000\ \mathrm{J/K}$ par cylindre | part locale du bloc, de la culasse et du liquide absent comme nœud |
-| $G_{ca}$ | $25\ \mathrm{W/K}$ par cylindre | chemin équivalent chemise-culasse-coolant-radiateur |
-| $G_{oa}$ | $100\ \mathrm{W/K}$ global | carter, échangeur d'huile et rejet final équivalents |
+| Famille | Paramètre | Valeur V2 |
+|---|---|---:|
+| Inertie | volume d'huile | $5{,}0\ \mathrm{L}$ |
+| Inertie | $C_c$ par cylindre | $18\ 000\ \mathrm{J/K}$ |
+| Inertie | $C_s$ du carter | $6\ 000\ \mathrm{J/K}$ |
+| Inertie | $C_w$ du coolant | $32\ 000\ \mathrm{J/K}$ |
+| Métal/huile | $G_{pc}$, $G_{po}$, $G_{co}$ | $18$, $12$, $8\ \mathrm{W/K}$ par cylindre |
+| Carter | $G_{os}$ | $90\ \mathrm{W/K}$ |
+| Carter/air | $G_{sa,nat}$, $G_{sa,ref}$ | $4$, $25\ \mathrm{W/K}$ |
+| Huile/air | $G_{oc,nat}$, $G_{oc,ref}$ | $0$, $35\ \mathrm{W/K}$ |
+| Cylindre/coolant | $G_{cw,stat}$, $G_{cw,pump}$ | $10$, $140\ \mathrm{W/K}$ par cylindre |
+| Huile/coolant | $G_{ow,stat}$, $G_{ow,pump}$ | $5$, $100\ \mathrm{W/K}$ |
+| Radiateur/air | $G_{rad,nat}$, $G_{rad,ref}$ | $20$, $650\ \mathrm{W/K}$ |
+| Air | $v_{ref}$, $n_v$, $v_{max}$ | $30\ \mathrm{m/s}$, $0{,}6$, $70\ \mathrm{m/s}$ |
+| Thermostats | huile | $90$ à $105\ ^\circ\mathrm{C}$ |
+| Thermostats | coolant | $82$ à $92\ ^\circ\mathrm{C}$ |
+| Ventilateur | commande, $v_{fan,max}$ | $94$ à $102\ ^\circ\mathrm{C}$, $8\ \mathrm{m/s}$ |
+| Pompes | régime de référence, exposant, bornes | $3000\ \mathrm{tr/min}$, $0{,}8$, $0$ à $1{,}5$ |
+| Gaz/paroi | $k_{g,p}$, $k_{g,c}$ | $0{,}45$, $0{,}35$ |
+| Frottement | $\mu$, $F_{brk}$, $v_{brk}$, $c_v$ | $0{,}04$, $50\ \mathrm{N}$, $0{,}1\ \mathrm{m/s}$, $6\ \mathrm{N\,s/m}$ |
 
-Ces trois dernières valeurs ne sont pas des caractéristiques Toyota mesurées. Elles constituent une calibration de première passe destinée à produire une température d'huile de l'ordre de $100$ à $120\ ^\circ\mathrm{C}$ sous une charge comparable au scénario qui divergeait auparavant. Elles devront être identifiées sur des transitoires et points stationnaires mesurés lorsque le régime, le couple, la température d'huile et la température de coolant seront disponibles ensemble.
+À $105\ \mathrm{mph}$, soit environ $46{,}9\ \mathrm{m/s}$, cette configuration donne avant commande thermostatique $G_{sa}\approx36{,}7\ \mathrm{W/K}$ et $G_{oc}\approx45{,}8\ \mathrm{W/K}$. La vitesse d'air radiateur vaut $v_{rad}\approx39{,}9\ \mathrm{m/s}$ ventilateur arrêté et sa conductance totalement ouverte vaut environ $791\ \mathrm{W/K}$. À $6500\ \mathrm{tr/min}$, les deux facteurs de pompe atteignent leur borne $1{,}5$.
+
+Ces valeurs, à l'exception des volumes publiés, ne sont pas des caractéristiques Toyota mesurées. Elles constituent une calibration d'ingénierie bornée par les capacités physiques, une enveloppe de FMEP et cinq familles de scénarios numériques. L'échangeur huile-air représente ici un chemin auxiliaire effectif de la configuration simulée ; il ne prétend pas décrire l'équipement de toutes les variantes du 2JZ. Une identification finale exige des transitoires synchronisés de régime, couple, températures d'huile, de coolant, de bloc et d'ambiance.
 
 ## 11. État des étapes d'implémentation
 
-1. Terminé : structure de paramètres thermiques indépendante de l'interface.
-2. Terminé : états $T_o$, $T_{p,i}$ et $T_{c,i}$ initialisés à l'ambiante.
-3. Terminé : accumulation des flux gaz-paroi et de la puissance de frottement à chaque sous-pas fluide.
-4. Terminé : intégration explicite simultanée à $50\ \mathrm{Hz}$ avec contrôle préalable de stabilité.
-5. Terminé : snapshot contenant les températures par cylindre, leurs moyennes et leurs maxima.
-6. Terminé : alimentation du snapshot de condition et de l'interface avec ces températures.
-7. Non retenu : l'ancien générateur de températures a été supprimé afin de ne conserver qu'une source de vérité.
-8. À faire : calibration sur des transitoires de chauffe et des points stationnaires mesurés.
-9. Reporté en V2 : remplacement de la paroi gazeuse fixe à $90\ ^\circ\mathrm{C}$ par un couplage énergétique conservatif.
+1. Terminé : paramètres V1 et V2 indépendants de l'interface.
+2. Terminé : états $T_o$, $T_s$, $T_w$, $T_{p,i}$ et $T_{c,i}$ initialisés à l'ambiante.
+3. Terminé : accumulation des flux gaz-paroi, du frottement et du point de fonctionnement rapide.
+4. Terminé : carter, échangeur huile-air, coolant et radiateur séparés.
+5. Terminé : convection forcée par la vitesse, thermostats continus et ventilateur.
+6. Terminé : facteurs de pompes dépendants du régime et bornés.
+7. Terminé : intégration simultanée à $50\ \mathrm{Hz}$ et stabilité vérifiée sur les conductances maximales.
+8. Terminé : bilan de puissance publié avec résidu relatif contrôlé.
+9. Terminé : interface alimentée par une source de vérité sans données thermiques aléatoires.
+10. Terminé : calibration d'ingénierie et scénarios de non-régression du 2JZ.
+11. À faire avec des données externes : identification et validation expérimentales du 2JZ.
+12. Reporté : remplacement de la paroi gazeuse fixe à $90\ ^\circ\mathrm{C}$ par un couplage retour vers le `GasSystem`.
 
 Les températures ne doivent pas être calculées dans la couche UI. L'interface affiche uniquement les snapshots `EngineThermalState` et `EngineConditionState` produits par la couche simulation.
 
@@ -920,7 +949,16 @@ Les températures ne doivent pas être calculées dans la couche UI. L'interface
 - Les conversions K vers °C sont testées séparément.
 - Le résultat reste presque identique lorsque le pas thermique est divisé par deux.
 
-Le fichier `test/engine_thermal_model_tests.cpp` couvre actuellement la valeur Hohenberg de l'exemple, l'équilibre à l'ambiante, la conservation de l'énergie de frottement, la symétrie des cylindres, la validation des fractions, la saturation du coefficient, l'indépendance au sous-échantillonnage, la stabilité d'Euler et les gardes sur les entrées physiques.
+Le fichier `test/engine_thermal_model_tests.cpp` couvre la valeur Hohenberg de l'exemple, l'équilibre à l'ambiante, la conservation de l'énergie de frottement, la symétrie, la validation des fractions, la saturation du coefficient, l'indépendance au sous-échantillonnage, la stabilité d'Euler et les gardes sur les entrées physiques.
+
+Le fichier `test/engine_cooling_model_tests.cpp` couvre en plus :
+
+- la loi de convection à $v_{ref}$ et sa saturation à $v_{max}$ ;
+- la continuité des thermostats et les bornes des pompes ;
+- l'augmentation distincte des rejets carter, huile et radiateur avec la vitesse ou le ventilateur ;
+- le bilan conservatif du réseau étendu ;
+- les enveloppes 2JZ au ralenti, en croisière, en haut régime et en pleine charge ;
+- une température d'huile plus basse en roulage qu'à l'arrêt sous les mêmes sources thermiques.
 
 ### 12.2 Scénarios de simulation
 
@@ -936,6 +974,17 @@ Le fichier `test/engine_thermal_model_tests.cpp` couvre actuellement la valeur H
 - les dérivées convergent vers zéro ;
 - les apports gaz et frottement égalent les rejets à l'ambiante ;
 - les deux cylindres convergent vers la même température si leurs entrées et paramètres sont identiques.
+
+#### Refroidissement dépendant du roulage
+
+- à sources gaz et frottement identiques, $47\ \mathrm{m/s}$ produit un rejet supérieur à $0\ \mathrm{m/s}$ ;
+- sous le seuil du thermostat, le radiateur reste fermé sans supprimer les échanges internes ;
+- à l'arrêt et coolant chaud, le ventilateur maintient une vitesse d'air radiateur non nulle ;
+- à haut régime, les conductances hydrauliques atteignent leur borne au lieu de croître sans limite.
+
+#### Régression 2JZ
+
+Les scénarios synthétiques ne rejouent pas un cycle homologué. Ils injectent des moyennes représentatives et vérifient des enveloppes : ralenti $900\ \mathrm{tr/min}$, croisière $2500\ \mathrm{tr/min}$ à $27\ \mathrm{m/s}$, haut régime $6500\ \mathrm{tr/min}$, puis pleine charge à l'arrêt et à $47\ \mathrm{m/s}$. Le cas interactif d'environ une minute en sixième à $123\ \mathrm{mph}$ a produit, depuis un démarrage froid, environ $61\ ^\circ\mathrm{C}$ pour l'huile, $118\ ^\circ\mathrm{C}$ pour le piston moyen, $42\ ^\circ\mathrm{C}$ pour le cylindre moyen et $39\ ^\circ\mathrm{C}$ pour le coolant. Ces nombres servent de contrôle de régression, pas de cible Toyota stationnaire.
 
 #### Différence entre bancs
 
@@ -955,10 +1004,12 @@ Pour identifier correctement les paramètres, il faut idéalement disposer de pl
 - température ambiante ;
 - régime, couple ou charge ;
 - température d'huile au carter ;
+- température du coolant en entrée et sortie moteur ;
+- température de paroi du carter inférieur ;
 - température de liner ou de surface de cylindre ;
 - température de piston mesurée ou reconstruite ;
 - temps depuis le démarrage ;
-- conditions de flux d'air autour des deux bancs.
+- vitesse véhicule, état du ventilateur et conditions de flux d'air autour du moteur.
 
 Les capacités $C$ contrôlent principalement la vitesse de chauffe. Les conductances $G$ contrôlent principalement les écarts stationnaires et les chemins de dissipation. Ajuster uniquement les conductances sur un seul point stationnaire ne permet pas d'identifier correctement les inerties.
 
@@ -966,7 +1017,7 @@ Les capacités $C$ contrôlent principalement la vitesse de chauffe. Les conduct
 
 ### 13.1 Pièces thermiques absentes
 
-La culasse, les soupapes, les segments, la bielle, le vilebrequin, les paliers, le carter et l'échappement existent pour tout ou partie dans la simulation mécanique ou gazeuse, mais pas comme masses thermiques couplées.
+La culasse, les soupapes, les segments, la bielle, le vilebrequin, les paliers et l'échappement existent pour tout ou partie dans la simulation mécanique ou gazeuse, mais pas comme masses thermiques couplées. Le carter et le coolant existent maintenant comme masses thermiques concentrées, sans géométrie ni discrétisation spatiale.
 
 Leur absence pose trois problèmes :
 
@@ -974,13 +1025,13 @@ Leur absence pose trois problèmes :
 - une partie réelle du chauffage de l'huile par les paliers et la distribution est absente ;
 - les chemins de conduction du piston par les segments et l'axe sont regroupés dans des conductances effectives.
 
-Cela n'empêche pas la V1, à condition de calibrer les conductances et de qualifier les sorties comme des estimations moyennes.
+Cela n'empêche pas cette première V2, à condition de calibrer les conductances et de qualifier les sorties comme des estimations moyennes.
 
 ### 13.2 Refroidissement du V-Twin
 
-Les deux V-Twin de référence sont refroidis par air dans leur usage réel, mais la codebase ne simule ni ailettes, ni ventilateur, ni vitesse d'air, ni masquage du cylindre arrière.
+Les deux V-Twin de référence sont refroidis par air dans leur usage réel. La codebase reçoit maintenant la vitesse véhicule et peut convertir celle-ci en conductance forcée, mais elle ne simule ni géométrie d'ailettes, ni champ aérodynamique, ni masquage du cylindre arrière.
 
-La V1 implémentée utilise actuellement un même $G_{ca}$ constant pour tous les cylindres. L'architecture conserve les états par cylindre, mais la configuration devra accepter des conductances par banc avant de représenter le masquage du cylindre arrière. Elle ne peut pas prédire correctement l'effet de la vitesse du véhicule, du vent, d'un ventilateur ou d'un arrêt prolongé sans enrichir ce paramètre, par exemple :
+La V2 permet $G_{ca}(v)$, mais utilise une même loi pour tous les cylindres. La configuration devra accepter des coefficients par banc avant de représenter le masquage du cylindre arrière. La vitesse véhicule reste un proxy de vitesse d'air : elle ne représente pas un vent latéral, le sillage du cadre ou la recirculation à l'arrêt.
 
 $$
 G_{ca}=G_{nat}+k_vv_{air}^{n}
@@ -988,7 +1039,7 @@ $$
 
 ### 13.3 Huile
 
-L'huile n'a actuellement ni débit, ni pompe, ni galerie, ni pression, ni carter géométrique. Un nœud global ne peut pas représenter :
+L'huile possède une température circulante, un carter concentré, un facteur de pompe et deux échangeurs effectifs. Elle n'a cependant ni débit massique calculé, ni galerie, ni pression, ni perte de charge, ni carter géométrique. Ce réseau ne peut pas représenter :
 
 - la température locale du film piston-liner ;
 - la température de sortie des paliers ;
@@ -996,13 +1047,17 @@ L'huile n'a actuellement ni débit, ni pompe, ni galerie, ni pression, ni carter
 - la stratification du carter ;
 - un défaut d'alimentation ou de pression.
 
-La température globale reste néanmoins exploitable pour la chauffe et la tendance de viscosité.
+Le facteur de pompe modifie un $UA$ ; ce n'est ni un débit en $\mathrm{kg/s}$ ni une pression en Pa. La température globale reste néanmoins exploitable pour la chauffe et la tendance de viscosité.
 
-### 13.4 Température des gaz et transfert actuel
+### 13.4 Coolant et échangeurs
 
-L'observateur V1 utilise une température de gaz déjà influencée par la paroi fixe à $90\ ^\circ\mathrm{C}$. Les paramètres calibrés dans ce mode ne seront pas nécessairement transférables sans modification au modèle V2 couplé.
+Le coolant est un volume bien mélangé unique. Le modèle ne distingue ni sortie de culasse, ni entrée de pompe, ni durites, ni température amont/aval du radiateur. Le thermostat et le ventilateur sont continus et sans hystérésis. Les échangeurs sont des $UA$ quasi stationnaires sans inertie propre, efficacité $\varepsilon$-NTU ni dépendance explicite aux débits des deux fluides.
 
-### 13.5 Valeurs maximales
+### 13.5 Température des gaz et transfert actuel
+
+L'observateur V2 utilise une température de gaz déjà influencée par la paroi fixe à $90\ ^\circ\mathrm{C}$. Son réseau propre est conservatif, mais la chaleur attribuée au piston et au cylindre n'est pas encore retirée une seconde fois au `GasSystem`. Les paramètres calibrés dans ce mode ne seront pas nécessairement transférables sans modification à un futur couplage bidirectionnel.
+
+### 13.6 Valeurs maximales
 
 Un nœud concentré ne donne aucune distribution spatiale. Les seuils de sécurité portant sur une gorge de segment, une calotte ou un point chaud de liner ne doivent pas être appliqués directement à $T_p$ ou $T_c$ sans une relation de reconstruction calibrée :
 
@@ -1012,7 +1067,7 @@ $$
 
 Une telle relation serait empirique et spécifique au moteur.
 
-### 13.6 Domaine de validité
+### 13.7 Domaine de validité
 
 Les corrélations de Woschni et Hohenberg fournissent un coefficient moyen empirique. Elles ne décrivent pas précisément les gradients locaux, le front de flamme, le cliquetis, l'impact d'un jet d'huile ou la turbulence tridimensionnelle.
 
@@ -1057,25 +1112,30 @@ Ces normes n'imposent pas directement les équations thermiques précédentes. E
 
 ## 16. Décision de conception implémentée
 
-La V1 remplace la notion de « température inventée à partir d'une sévérité » par celle de « température estimée par bilan d'énergie », tout en restant un observateur non intrusif.
+La V2 remplace la notion de « température inventée à partir d'une sévérité » par celle de « température estimée par bilan d'énergie instrumenté », tout en restant un observateur non intrusif vis-à-vis du `GasSystem`.
 
-Le modèle minimal retenu est donc :
+Le modèle retenu est donc :
 
 - Hohenberg pour le transfert gaz-paroi ;
 - capacités thermiques concentrées ;
 - conductances thermiques calibrables ;
 - puissance de frottement calculée à partir des signaux existants ;
-- un état d'huile global et deux paires piston/cylindre pour un V-Twin ;
+- un état d'huile global, un carter et un coolant optionnels, puis une paire piston/cylindre par chambre ;
+- des chemins distincts pour le carter, le refroidisseur huile-air et le radiateur ;
+- une convection forcée dépendante de la vitesse véhicule et du ventilateur ;
+- des thermostats continus et des facteurs de pompe dépendants du régime ;
 - accumulation des flux rapides et intégration à $50\ \mathrm{Hz}$ ;
 - initialisation à la température ambiante ;
-- conservation interne obtenue par des flux opposés calculés sur le même état et vérifiée par test unitaire ;
-- couplage retour vers les gaz reporté après calibration.
+- conservation interne obtenue par des flux opposés calculés sur le même état ;
+- publication du bilan instantané et contrôle du résidu relatif sous $10^{-9}$ ;
+- compatibilité V1 lorsque les capacités de carter et de coolant sont nulles ;
+- couplage retour vers les gaz reporté après calibration expérimentale.
 
 Cette solution est compatible avec les pièces et signaux actuels. Ses principales inconnues ne nécessitent pas de nouvelles pièces simulées, mais des paramètres thermiques explicites : capacités, volume d'huile, propriétés des matériaux et conductances de refroidissement.
 
-## 17. Spécification V2 : circuit de refroidissement et bilan énergétique instrumenté
+## 17. Spécification V2 implémentée : circuit de refroidissement et bilan énergétique instrumenté
 
-Cette section définit l'extension à implémenter avant toute nouvelle calibration du 2JZ. Elle remplace l'interprétation d'une conductance unique huile-ambiance par des chemins physiques séparés, tout en conservant la compatibilité des moteurs V1 qui ne déclarent pas ces nouveaux paramètres.
+Cette section constitue le contrat mathématique de l'implémentation. Elle remplace l'interprétation d'une conductance unique huile-ambiance par des chemins physiques séparés, tout en conservant la compatibilité des moteurs V1 qui ne déclarent pas ces nouveaux paramètres.
 
 Les travaux de Zoz et al. distinguent explicitement les échanges de l'huile avec la combustion, le coolant et l'air du compartiment moteur. Sangeorzan et al. montrent qu'un modèle 1D calibré peut reproduire conjointement les températures d'huile, de coolant et de piston. Nomura et al. soulignent que les conditions de roulage et l'écoulement autour du moteur doivent faire partie du bilan pour prédire une température sous véhicule complet. La V2 adopte cette topologie, sans prétendre remplacer leurs modèles de circulation détaillés.
 
@@ -1388,3 +1448,20 @@ L'implémentation V2 est acceptée lorsque :
 8. les moteurs sans configuration V2 conservent le comportement V1 ;
 9. le tableau de condition expose les flux nécessaires pour diagnostiquer une température élevée ;
 10. la calibration du 2JZ est vérifiée sur les cinq familles de points précédentes ou explicitement marquée non validée lorsque les mesures manquent.
+
+État au terme de l'implémentation :
+
+| Critère | État | Preuve |
+|---:|---|---|
+| 1 | satisfait | tests arrêt/roulage avec sources identiques |
+| 2 | satisfait | convection naturelle et commande ventilateur testées |
+| 3 | satisfait | `smoothstep` testé aux bornes et au milieu |
+| 4 | satisfait | loi de pompe testée à zéro, au régime de référence et à saturation |
+| 5 | satisfait | états $T_s$ et $T_w$ intégrés avec capacités distinctes |
+| 6 | satisfait | résidu publié et exigé inférieur à $10^{-9}$ |
+| 7 | satisfait | test de subdivision rapide conservé |
+| 8 | satisfait | paramètres V2 nuls par défaut, tests V1 inchangés |
+| 9 | satisfait | panneau `THERMAL POWER BALANCE` et panneau `COOLING SYSTEM` |
+| 10 | partiel explicite | cinq enveloppes numériques couvertes, validation mesurée indisponible |
+
+La seule réserve d'acceptation est donc métrologique, pas architecturale : il manque des acquisitions Toyota ou banc moteur synchronisées pour transformer les paramètres effectifs en paramètres identifiés avec intervalles d'incertitude.

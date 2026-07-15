@@ -9,6 +9,7 @@
 #include "units.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -20,6 +21,16 @@ namespace {
 
     std::string formatTemperature(double temperatureK) {
         return formatValue(temperatureK - units::K0, 0, "C");
+    }
+
+    std::string formatPower(double powerW) {
+        return std::abs(powerW) >= 1000.0
+            ? formatValue(powerW / 1000.0, 1, "kW")
+            : formatValue(powerW, 0, "W");
+    }
+
+    std::string formatPercent(double fraction) {
+        return formatValue(fraction * 100.0, 0, "%");
     }
 
     void configureGauge(Gauge *gauge, float minimum, float maximum, int minorStep, int majorStep) {
@@ -121,9 +132,11 @@ void EngineConditionCluster::render() {
 
     renderTemperaturePanel(temperatureBounds);
     const Bounds bottom = inner.verticalSplit(0.0f, 0.29f);
-    renderCylinderPanel(bottom.horizontalSplit(0.0f, 0.66f));
-    renderOperatingPointPanel(bottom.horizontalSplit(0.67f, 1.0f).verticalSplit(0.52f, 1.0f));
-    renderModelCoveragePanel(bottom.horizontalSplit(0.67f, 1.0f).verticalSplit(0.0f, 0.48f));
+    renderCylinderPanel(bottom.horizontalSplit(0.0f, 0.60f));
+    const Bounds diagnostics = bottom.horizontalSplit(0.61f, 1.0f);
+    renderOperatingPointPanel(diagnostics.verticalSplit(0.70f, 1.0f));
+    renderThermalPowerPanel(diagnostics.verticalSplit(0.30f, 0.68f));
+    renderCoolingSystemPanel(diagnostics.verticalSplit(0.0f, 0.28f));
     UiElement::render();
 }
 
@@ -137,6 +150,8 @@ void EngineConditionCluster::refreshCachedStrings() {
     m_cachedRevision = m_state.revision;
     refreshTemperatureStrings();
     refreshOperatingPointStrings();
+    refreshThermalPowerStrings();
+    refreshCoolingStrings();
     updateTemperatureGauges();
 }
 
@@ -164,6 +179,39 @@ void EngineConditionCluster::refreshOperatingPointStrings() {
     else {
         m_thermalInputText = std::to_string(m_state.thermal.inputAnomalyCount) + " ANOMALIES";
     }
+}
+
+void EngineConditionCluster::refreshThermalPowerStrings() {
+    const EngineThermalPowerBalance &power = m_state.thermal.powerBalance;
+    m_heatInputText = formatPower(power.gasToPistonsW + power.gasToCylindersW);
+    m_frictionHeatText = formatPower(power.frictionW);
+    m_heatRejectedText = formatPower(power.ambientRejectionW);
+    m_oilStoragePowerText = formatPower(power.oilStorageW);
+    m_coolantStoragePowerText = m_state.thermal.coolantModeled
+        ? formatPower(power.coolantStorageW)
+        : "N/A";
+    m_energyResidualText = formatValue(power.relativeEnergyResidual * 1e6, 2, "ppm");
+}
+
+void EngineConditionCluster::refreshCoolingStrings() {
+    const EngineThermalState &thermal = m_state.thermal;
+    const EngineCoolingState &cooling = thermal.cooling;
+    m_coolantStatusText = thermal.coolantModeled
+        ? formatTemperature(thermal.coolantTemperatureK)
+            + " // THERM " + formatPercent(cooling.coolantThermostatOpening)
+        : "NOT MODELED";
+    m_sumpStatusText = thermal.sumpModeled
+        ? formatTemperature(thermal.sumpTemperatureK)
+            + " // OIL THERM " + formatPercent(cooling.oilThermostatOpening)
+        : "NOT MODELED";
+    m_airAndFanText = thermal.coolantModeled
+        ? formatValue(cooling.effectiveRadiatorAirSpeedMPerS, 1, "m/s")
+            + " // FAN " + formatPercent(cooling.fanDuty)
+        : "NOT MODELED";
+    m_pumpStatusText = thermal.coolantModeled
+        ? "W " + formatPercent(cooling.coolantPumpFactor)
+            + " // O " + formatPercent(cooling.oilPumpFactor)
+        : "NOT MODELED";
 }
 
 void EngineConditionCluster::updateTemperatureGauges() {
@@ -295,16 +343,30 @@ void EngineConditionCluster::renderOperatingPointPanel(const Bounds &bounds) {
     renderValueTile(grid.get(body, 3, 0).inset(2.0f), "THERMAL INPUT", m_thermalInputText);
 }
 
-void EngineConditionCluster::renderModelCoveragePanel(const Bounds &bounds) {
+void EngineConditionCluster::renderThermalPowerPanel(const Bounds &bounds) {
     drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
     const Bounds inner = bounds.inset(8.0f);
-    drawText("MODEL COVERAGE", inner.verticalSplit(0.78f, 1.0f), 14.0f, Bounds::tl);
+    drawText("THERMAL POWER BALANCE", inner.verticalSplit(0.78f, 1.0f), 14.0f, Bounds::tl);
+    const Bounds body = inner.verticalSplit(0.0f, 0.72f);
+    Grid grid{ 3, 2 };
+    renderValueTile(grid.get(body, 0, 0).inset(2.0f), "COMBUSTION", m_heatInputText);
+    renderValueTile(grid.get(body, 1, 0).inset(2.0f), "FRICTION", m_frictionHeatText);
+    renderValueTile(grid.get(body, 2, 0).inset(2.0f), "REJECTED", m_heatRejectedText);
+    renderValueTile(grid.get(body, 0, 1).inset(2.0f), "OIL STORAGE", m_oilStoragePowerText);
+    renderValueTile(grid.get(body, 1, 1).inset(2.0f), "COOLANT STORAGE", m_coolantStoragePowerText);
+    renderValueTile(grid.get(body, 2, 1).inset(2.0f), "RESIDUAL", m_energyResidualText);
+}
+
+void EngineConditionCluster::renderCoolingSystemPanel(const Bounds &bounds) {
+    drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
+    const Bounds inner = bounds.inset(8.0f);
+    drawText("COOLING SYSTEM", inner.verticalSplit(0.78f, 1.0f), 14.0f, Bounds::tl);
     const Bounds body = inner.verticalSplit(0.0f, 0.72f);
     Grid grid{ 1, 4 };
-    renderInfoRow(grid.get(body, 0, 0), "SIMULATED", "OIL / PISTONS / CYLINDERS");
-    renderInfoRow(grid.get(body, 0, 1), "WEAR / RUL", "NOT CALIBRATED");
-    renderInfoRow(grid.get(body, 0, 2), "NOT MODELED", "COOLANT / OIL PRESSURE");
-    renderInfoRow(grid.get(body, 0, 3), "COLOR BANDS", "GUIDANCE ONLY");
+    renderInfoRow(grid.get(body, 0, 0), "COOLANT", m_coolantStatusText);
+    renderInfoRow(grid.get(body, 0, 1), "SUMP", m_sumpStatusText);
+    renderInfoRow(grid.get(body, 0, 2), "RADIATOR AIR", m_airAndFanText);
+    renderInfoRow(grid.get(body, 0, 3), "PUMP FACTORS", m_pumpStatusText);
 }
 
 void EngineConditionCluster::renderInfoRow(

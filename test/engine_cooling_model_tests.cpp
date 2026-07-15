@@ -44,6 +44,102 @@ namespace {
         sample.frictionPowerW = 1000.0;
         return sample;
     }
+
+    void configure2JzOilCooling(EngineCoolingParameters &cooling) {
+        cooling.sumpThermalCapacityJPerK = 6000.0;
+        cooling.oilSumpConductanceWPerK = 90.0;
+        cooling.sumpNaturalAirConductanceWPerK = 4.0;
+        cooling.sumpForcedAirConductanceAtReferenceWPerK = 25.0;
+        cooling.oilCoolerForcedAirConductanceAtReferenceWPerK = 35.0;
+        cooling.oilThermostatStartTemperatureK = units::celcius(90.0);
+        cooling.oilThermostatFullOpenTemperatureK = units::celcius(105.0);
+    }
+
+    void configure2JzCoolant(EngineCoolingParameters &cooling) {
+        cooling.coolantThermalCapacityJPerK = 32000.0;
+        cooling.cylinderCoolantStaticConductanceWPerK = 10.0;
+        cooling.cylinderCoolantPumpedConductanceAtReferenceWPerK = 140.0;
+        cooling.oilCoolantStaticConductanceWPerK = 5.0;
+        cooling.oilCoolantPumpedConductanceAtReferenceWPerK = 100.0;
+        cooling.radiatorNaturalAirConductanceWPerK = 20.0;
+        cooling.radiatorForcedAirConductanceAtReferenceWPerK = 650.0;
+        cooling.coolantThermostatFullOpenTemperatureK = units::celcius(92.0);
+        cooling.fanTurnOnTemperatureK = units::celcius(94.0);
+        cooling.fanFullSpeedTemperatureK = units::celcius(102.0);
+    }
+
+    EngineThermalParameters create2JzThermalParameters() {
+        EngineThermalParameters parameters;
+        parameters.cylinderThermalCapacityJPerK = 18000.0;
+        parameters.oilVolumeM3 = units::volume(5.0, units::L);
+        parameters.pistonCylinderConductanceWPerK = 18.0;
+        parameters.pistonOilConductanceWPerK = 12.0;
+        parameters.cylinderOilConductanceWPerK = 8.0;
+        parameters.cylinderAmbientConductanceWPerK = 0.0;
+        parameters.oilAmbientConductanceWPerK = 0.0;
+        parameters.pistonGasHeatTransferFactor = 0.45;
+        parameters.cylinderGasHeatTransferFactor = 0.35;
+        configure2JzOilCooling(parameters.cooling);
+        configure2JzCoolant(parameters.cooling);
+        return parameters;
+    }
+
+    CylinderThermalSample create2JzHighLoadSample() {
+        CylinderThermalSample sample;
+        sample.gasTemperatureK = 1400.0;
+        sample.gasPressurePa = units::pressure(7.0, units::bar);
+        sample.chamberVolumeM3 = units::volume(300.0, units::cc);
+        sample.meanPistonSpeedMPerS = 18.6;
+        sample.frictionPowerW = 3700.0;
+        return sample;
+    }
+
+    CylinderThermalSample createOperatingSample(
+        double gasTemperatureK,
+        double gasPressureBar,
+        double chamberVolumeCc,
+        double meanPistonSpeedMPerS,
+        double frictionPowerW)
+    {
+        CylinderThermalSample sample;
+        sample.gasTemperatureK = gasTemperatureK;
+        sample.gasPressurePa = units::pressure(gasPressureBar, units::bar);
+        sample.chamberVolumeM3 = units::volume(chamberVolumeCc, units::cc);
+        sample.meanPistonSpeedMPerS = meanPistonSpeedMPerS;
+        sample.frictionPowerW = frictionPowerW;
+        return sample;
+    }
+
+    EngineThermalModel run2JzScenario(
+        const CylinderThermalSample &sample,
+        double vehicleSpeedMPerS,
+        double engineSpeedRpm,
+        double durationSeconds)
+    {
+        const EngineThermalParameters parameters = create2JzThermalParameters();
+        const CylinderThermalProperties cylinder {
+            0.25,
+            units::distance(86.0, units::mm),
+            units::volume(50.0, units::cc)
+        };
+        EngineThermalModel model;
+        EXPECT_TRUE(model.initialize(parameters, std::vector<CylinderThermalProperties>(6, cylinder)));
+        const std::vector<CylinderThermalSample> samples(6, sample);
+        const EngineThermalOperatingPoint operatingPoint {
+            vehicleSpeedMPerS,
+            units::rpm(engineSpeedRpm)
+        };
+        const int updateCount = static_cast<int>(durationSeconds / parameters.updateIntervalSeconds);
+        for (int i = 0; i < updateCount; ++i) {
+            model.update(samples, operatingPoint, parameters.updateIntervalSeconds);
+        }
+        return model;
+    }
+
+    EngineThermalModel run2JzHighLoad(double vehicleSpeedMPerS, double durationSeconds) {
+        return run2JzScenario(
+            create2JzHighLoadSample(), vehicleSpeedMPerS, 6500.0, durationSeconds);
+    }
 }
 
 TEST(EngineCoolingModelTests, ScalesAirConductanceAtReferenceSpeed) {
@@ -121,4 +217,73 @@ TEST(EngineCoolingModelTests, PublishesConservativeExtendedPowerBalance) {
     EXPECT_GT(state.powerBalance.gasToPistonsW, 0.0);
     EXPECT_GT(state.powerBalance.frictionW, 0.0);
     EXPECT_LT(state.powerBalance.relativeEnergyResidual, 1e-12);
+}
+
+TEST(EngineCoolingModelTests, KeepsLegacyNetworkIndependentFromVehicleSpeed) {
+    const EngineThermalParameters parameters;
+    EngineThermalModel stopped;
+    EngineThermalModel moving;
+    ASSERT_TRUE(stopped.initialize(parameters, { createCylinderProperties() }));
+    ASSERT_TRUE(moving.initialize(parameters, { createCylinderProperties() }));
+    const CylinderThermalSample sample = createLoadedSample();
+    stopped.update({ sample }, { 0.0, units::rpm(3000.0) }, parameters.updateIntervalSeconds);
+    moving.update({ sample }, { 60.0, units::rpm(3000.0) }, parameters.updateIntervalSeconds);
+
+    EXPECT_DOUBLE_EQ(stopped.getState().oilTemperatureK, moving.getState().oilTemperatureK);
+    EXPECT_DOUBLE_EQ(
+        stopped.getState().averagePistonTemperatureK,
+        moving.getState().averagePistonTemperatureK);
+    EXPECT_DOUBLE_EQ(
+        stopped.getState().averageCylinderTemperatureK,
+        moving.getState().averageCylinderTemperatureK);
+}
+
+TEST(EngineCoolingModelTests, Keeps2JzOilBoundedDuringHighSpeedHighLoadRun) {
+    const EngineThermalModel model = run2JzHighLoad(47.0, 60.0);
+    const EngineThermalState &state = model.getState();
+
+    EXPECT_GT(state.oilTemperatureK, units::celcius(25.0));
+    EXPECT_LT(state.oilTemperatureK, units::celcius(120.0));
+    EXPECT_LT(state.coolantTemperatureK, units::celcius(110.0));
+    EXPECT_GT(state.averagePistonTemperatureK, state.averageCylinderTemperatureK);
+    EXPECT_GT(state.cooling.sumpAmbientConductanceWPerK, 30.0);
+    EXPECT_DOUBLE_EQ(state.cooling.coolantPumpFactor, 1.5);
+    EXPECT_LT(state.powerBalance.relativeEnergyResidual, 1e-12);
+}
+
+TEST(EngineCoolingModelTests, Keeps2JzIdleAndCruiseInsideCalibrationEnvelope) {
+    const CylinderThermalSample idleSample = createOperatingSample(
+        550.0, 1.1, 400.0, 2.6, 300.0);
+    const CylinderThermalSample cruiseSample = createOperatingSample(
+        900.0, 2.0, 350.0, 7.2, 800.0);
+    const EngineThermalState idle = run2JzScenario(
+        idleSample, 0.0, 900.0, 600.0).getState();
+    const EngineThermalState cruise = run2JzScenario(
+        cruiseSample, 27.0, 2500.0, 900.0).getState();
+
+    EXPECT_LT(idle.oilTemperatureK, units::celcius(110.0));
+    EXPECT_LT(idle.coolantTemperatureK, units::celcius(110.0));
+    EXPECT_LT(cruise.oilTemperatureK, units::celcius(130.0));
+    EXPECT_LT(cruise.coolantTemperatureK, units::celcius(105.0));
+    EXPECT_GT(cruise.cooling.sumpAmbientConductanceWPerK, idle.cooling.sumpAmbientConductanceWPerK);
+}
+
+TEST(EngineCoolingModelTests, UsesPlausibleHighSpeedFrictionCalibrationEnvelope) {
+    constexpr double displacementM3 = 0.002998;
+    constexpr double engineSpeedRpm = 6500.0;
+    constexpr double frictionPowerW = 6.0 * 3700.0;
+    const double fmepPa = 120.0 * frictionPowerW
+        / (displacementM3 * engineSpeedRpm);
+
+    EXPECT_GT(fmepPa, units::pressure(0.5, units::bar));
+    EXPECT_LT(fmepPa, units::pressure(2.0, units::bar));
+}
+
+TEST(EngineCoolingModelTests, VehicleAirflowLowers2JzOilTemperatureAtSustainedLoad) {
+    const EngineThermalModel stopped = run2JzHighLoad(0.0, 300.0);
+    const EngineThermalModel moving = run2JzHighLoad(47.0, 300.0);
+
+    EXPECT_LT(moving.getState().oilTemperatureK, stopped.getState().oilTemperatureK);
+    EXPECT_LT(moving.getState().sumpTemperatureK, stopped.getState().sumpTemperatureK);
+    EXPECT_LT(moving.getState().coolantTemperatureK, stopped.getState().coolantTemperatureK);
 }

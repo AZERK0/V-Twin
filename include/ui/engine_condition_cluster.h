@@ -26,6 +26,8 @@ private:
     void refreshCachedStrings();
     void refreshTemperatureStrings();
     void refreshOperatingPointStrings();
+    void refreshThermalPowerStrings();
+    void refreshCoolingStrings();
     void updateTemperatureGauges();
 
     void renderHeader(const Bounds &bounds);
@@ -41,7 +43,8 @@ private:
     void renderCylinderColumn(const Bounds &bounds, int firstCylinder, int cylinderCount);
     void renderCylinderRow(const Bounds &bounds, int cylinderIndex, float textSize);
     void renderOperatingPointPanel(const Bounds &bounds);
-    void renderModelCoveragePanel(const Bounds &bounds);
+    void renderThermalPowerPanel(const Bounds &bounds);
+    void renderCoolingSystemPanel(const Bounds &bounds);
     void renderInfoRow(const Bounds &bounds, const std::string &label, const std::string &value);
     void renderUnavailableState(const Bounds &bounds);
 
@@ -60,6 +63,16 @@ private:
     std::string m_intakeAfrText;
     std::string m_exhaustOxygenText;
     std::string m_thermalInputText;
+    std::string m_heatInputText;
+    std::string m_frictionHeatText;
+    std::string m_heatRejectedText;
+    std::string m_oilStoragePowerText;
+    std::string m_coolantStoragePowerText;
+    std::string m_energyResidualText;
+    std::string m_coolantStatusText;
+    std::string m_sumpStatusText;
+    std::string m_airAndFanText;
+    std::string m_pumpStatusText;
 };
 
 #endif
