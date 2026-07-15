@@ -2,45 +2,42 @@
 
 ![V-Twin screenshot](docs/public/screenshots/screenshot_v01.png?raw=true)
 
-V-Twin is a fork of Engine Simulator focused on real-time engine analysis, audio, and diagnostics. In this fork, the engine wear dashboard is a core part of the project: it turns live simulation signals into durability indicators, exposure metrics, and failure-mode oriented feedback.
+V-Twin is a fork of Engine Simulator focused on real-time engine analysis, audio, thermal observation, and diagnostics. Its dedicated engine-condition screen separates physical simulation outputs from metrics that still require calibration.
 
 ## What V-Twin is for
 
 - simulating internal combustion engines in real time
 - producing engine audio and response behavior
-- exploring operating stress, damage accumulation, and wear diagnostics
-- building UI and tooling around engine health visualization
+- exploring operating conditions and thermal behavior
+- building UI and tooling around engine-condition visualization
 
-V-Twin is still a simulator, not a certified engineering tool. The wear model is intentionally designed as a meaningful diagnostic layer, but it remains a simulated model rather than a validated real-world measurement system.
+V-Twin is still a simulator, not a certified engineering tool. Oil, piston, and cylinder values are lumped thermal estimates rather than local sensor measurements.
 
-## Engine wear mode
+## Engine condition screen
 
-Engine wear mode is now at the center of the project.
+The engine-condition screen is a full-screen engineering view, separate from the engine and exhaust-flow analysis screen.
 
 It introduces:
 
-- a wear model that derives health and durability metrics from live simulator state
-- a published snapshot consumed by the UI without mixing rendering and simulation logic
-- a dedicated dashboard for health, reserves, stress, accumulated damage, and exposure history
-- a dominant failure mode view to guide inspection and interpretation
+- a published snapshot that keeps simulation data out of rendering code
+- large gauges for oil, hottest-piston, and hottest-cylinder temperatures
+- a per-cylinder thermal map
+- direct engine, vehicle, transmission, dyno, intake, and combustion telemetry
+- explicit model coverage and data-quality information
 
-Key metrics exposed by the wear dashboard include:
+Key metrics exposed by the screen include:
 
-- global health
-- thermal reserve
-- lubrication reserve
-- detonation reserve
-- remaining useful life
-- damage rate
 - simulated oil, hottest-piston, and hottest-cylinder temperatures
-- accumulated subsystem damage
-- over-rev, over-temp, cold-load, starvation, and knock events
+- engine and vehicle speed, gear, torque, and power
+- manifold pressure, air flow, and volumetric efficiency
+- ignition, starter, dyno, and hold states
+- throttle, intake AFR, exhaust oxygen, and thermal-input validity
 
 See `ENGINE_WEAR_METRICS.md` for the displayed metrics and `ENGINE_THERMAL_MODEL.md` for the equations, implementation mapping, assumptions, and current physical limits.
 
 ## Controls
 
-The simulator keeps the original keyboard-driven workflow, with an added shortcut for the wear HUD.
+The simulator keeps the original keyboard-driven workflow, with a shortcut for the engine-condition screen.
 
 | Key/Input | Action |
 | :---: | :--- |
@@ -51,7 +48,7 @@ The simulator keeps the original keyboard-driven workflow, with an added shortcu
 | `G` + scroll | Change hold speed |
 | `F` | Toggle fullscreen |
 | `I` | Display dyno stats in the information panel |
-| `J` | Toggle engine wear HUD |
+| `J` | Switch between engine analysis and engine condition |
 | `Shift` | Clutch |
 | `Space` + scroll | Fine throttle adjustment |
 | `Up Arrow` | Up gear |
@@ -181,9 +178,9 @@ python3 -m tkinter
 ## Project structure
 
 - `src/` and `include/`: core simulator, rendering, and UI code
-- `src/simulation/engine_wear_model.cpp`: wear model implementation
-- `src/ui/engine_wear_cluster.cpp`: wear dashboard rendering
-- `ENGINE_WEAR_METRICS.md`: wear-model metric reference
+- `src/simulation/engine_condition_model.cpp`: condition snapshot implementation
+- `src/ui/engine_condition_cluster.cpp`: dedicated condition-screen rendering
+- `ENGINE_WEAR_METRICS.md`: displayed metrics, formulas, provenance, and wear-model limits
 - `ENGINE_THERMAL_MODEL.md`: oil, piston, and cylinder thermal-model specification and implementation
 - `assets/engines/`: sample engine definitions
 - `launcher_python/`: optional Python launcher GUI
@@ -193,4 +190,4 @@ python3 -m tkinter
 
 - this repository is actively evolving
 - some historical upstream references may still exist in code or asset names
-- the current fork direction prioritizes V-Twin branding, Linux usability, and engine wear diagnostics
+- the current fork direction prioritizes V-Twin branding, Linux usability, and trustworthy engine diagnostics

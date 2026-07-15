@@ -1,345 +1,305 @@
-# Engine Wear Metrics
-
-This document explains the engine wear metrics currently exposed by the simulation-driven wear model.
-
-Oil, piston, and cylinder temperatures now come from the lumped thermal observer described in `ENGINE_THERMAL_MODEL.md`. The remaining lifetime, margin, and accumulated-damage outputs are engineering estimators that still require calibration against measurements.
-
-Relevant code:
-
-- `include/simulation/engine_wear_model.h`
-- `src/simulation/engine_wear_model.cpp`
-- `include/simulation/engine_thermal_model.h`
-- `src/simulation/engine_thermal_model.cpp`
-- `include/ui/engine_wear_cluster.h`
-- `src/ui/engine_wear_cluster.cpp`
-
-## Philosophy
+# Écran de condition moteur et métriques d'usure
 
-The wear system is split into three layers:
+## 1. Objet
 
-- `EngineWearModel`: computes wear-related state from simulation signals
-- `EngineWearState`: immutable snapshot published to the UI
-- `EngineWearCluster`: renders the snapshot without doing wear logic
-
-The metrics are grouped into four engineering questions:
-
-1. What is the current health state?
-2. What is stressing the engine right now?
-3. What damage has already accumulated?
-4. What operating history explains that damage?
-
-## KPI Strip
-
-### Health
-
-- Meaning: overall state of health of the engine model
-- Range: `0% -> 100%`
-- Interpretation:
-  - `100%` means no effective damage accumulated yet
-  - lower values mean the weighted subsystem damage is increasing
-- Current model: derived from weighted accumulated damage across bottom end, ring seal, valvetrain, head/gasket, and lubrication system
+Ce document décrit le nouvel écran `ENGINE CONDITION`, les valeurs qu'il affiche et les garanties associées à chacune d'elles.
 
-### Thermal Res
+L'écran est un tableau de suivi thermique et opérationnel. Il ne prétend plus calculer une santé globale, une durée de vie restante ou un dommage mécanique sans modèle calibré. Cette distinction est volontaire : une température issue d'un bilan thermique peut être présentée comme une estimation physique, tandis qu'un pourcentage d'usure sans données d'essai ne doit pas être présenté comme une mesure.
 
-- Meaning: remaining thermal reserve before thermal loading becomes critical
-- Range: `0% -> 100%`
-- Interpretation:
-  - high = thermal operating point is healthy
-  - low = chamber temperature, pressure, rpm, and cooling stress are converging toward risk
-- Current thermal inputs:
-  - simulated mean oil temperature
-  - simulated maximum piston temperature
-  - simulated maximum cylinder temperature
-- Not modeled yet:
-  - coolant temperature
-  - thermal gradients and local hot spots
+Le détail du réseau thermique, de ses équations et de sa calibration se trouve dans [`ENGINE_THERMAL_MODEL.md`](ENGINE_THERMAL_MODEL.md).
 
-### Lube Res
+Fichiers principaux :
 
-- Meaning: remaining lubrication reserve before oil film quality becomes critical
-- Range: `0% -> 100%`
-- Interpretation:
-  - high = oil thermal window and loading are acceptable
-  - low = increased risk of film collapse, starvation, or boundary friction
-- Future real mapping:
-  - oil temp
-  - oil pressure
-  - load and rpm
-  - cold high-load events
+- `include/simulation/engine_condition_model.h` ;
+- `src/simulation/engine_condition_model.cpp` ;
+- `include/simulation/engine_thermal_model.h` ;
+- `src/simulation/engine_thermal_model.cpp` ;
+- `include/ui/engine_condition_cluster.h` ;
+- `src/ui/engine_condition_cluster.cpp`.
 
-### Det Res
+## 2. Architecture
 
-- Meaning: remaining detonation reserve before combustion becomes knock-limited
-- Range: `0% -> 100%`
-- Interpretation:
-  - high = combustion is comfortably away from knock risk
-  - low = pressure, temperature, load, and lean behavior are pushing the engine toward detonation damage
-- Future real mapping:
-  - knock sensor activity
-  - ignition corrections
-  - lambda / AFR
-  - boost / manifold pressure
+La fonctionnalité est séparée en trois responsabilités :
 
-### Model Output
+1. `EngineThermalModel` calcule les températures physiques de l'huile, des pistons et des cylindres.
+2. `EngineConditionModel` construit un snapshot cohérent des états moteur, véhicule, transmission, banc et thermique.
+3. `EngineConditionCluster` convertit les unités, compose les libellés et dessine l'écran sans inventer de donnée métier.
 
-This tile summarizes the predictive side of the model.
+`EngineConditionState` est publié à la fin de chaque frame de simulation. Il contient des valeurs brutes dans les unités internes et une copie du dernier `EngineThermalState`. La révision du snapshot permet à l'interface de ne reformater les chaînes que lorsqu'une nouvelle valeur est disponible.
 
-#### RUL
+Cette structure permet d'ajouter plus tard une famille de métriques sans coupler son calcul au rendu. Un futur modèle d'usure devra publier son propre état validé ou étendre le snapshot de condition, mais ses équations resteront dans la couche simulation.
 
-- Meaning: remaining useful life at the current modeled duty severity
-- Unit: hours
-- Interpretation:
-  - not absolute calendar life
-  - it is a projected life horizon if the current wear regime continues
+## 3. Navigation et organisation de l'écran
 
-#### Damage Rate
+Le simulateur possède maintenant quatre vues accessibles avec `Tab` :
 
-- Meaning: current rate of degradation accumulation
-- Unit: `%/h`
-- Interpretation:
-  - low = current operating point is sustainable
-  - high = the engine is consuming life quickly right now
+1. analyse moteur et oscilloscopes, avec le débit d'échappement au centre ;
+2. vue moteur plein écran ;
+3. vue moteur avec instrumentation latérale ;
+4. écran `ENGINE CONDITION`.
 
-#### Confidence
+La touche `J` bascule directement entre l'analyse moteur et l'écran de condition.
 
-- Meaning: trust level in the metric package
-- Range: `0% -> 100%`
-- Current model: fixed at `100%`
-- Future use:
-  - simulator mode can stay near `100%`
-  - OBD twin mode can reduce confidence when values are inferred rather than directly observed
+L'écran de condition est organisé dans l'ordre de lecture suivant :
 
-## Inspection Focus
+- identité du moteur et nature des données ;
+- états `Ignition`, `Starter`, `Dyno` et `Hold` ;
+- télémétrie opérationnelle commune ;
+- trois grandes jauges thermiques ;
+- carte thermique par cylindre ;
+- point de fonctionnement instantané ;
+- périmètre et limites du modèle.
 
-This panel is intended to answer: where should an engineer look first?
+## 4. Nature et provenance des données
 
-### Primary Mode
+| Groupe | Métrique UI | Source | Nature |
+|---|---|---|---|
+| États | `IGNITION` | `IgnitionModule::m_enabled` | état direct |
+| États | `STARTER` | `StarterMotor::m_enabled` | état direct |
+| États | `DYNO` | `Dynamometer::m_enabled` | état direct |
+| États | `HOLD` | `Dynamometer::m_hold` | état direct |
+| Cinématique | `ENGINE SPEED` | vitesse du vilebrequin | calcul d'unité |
+| Cinématique | `VEHICLE SPEED` | `Vehicle::getSpeed()` | calcul d'unité |
+| Transmission | `GEAR` | `Transmission::getGear()` | état direct |
+| Banc | `TORQUE` | couple filtré du dynamomètre | signal simulé |
+| Banc | `POWER` | couple du banc et vitesse moteur | signal dérivé |
+| Admission | `MANIFOLD PRESSURE` | `Engine::getManifoldPressure()` | signal simulé |
+| Admission | `AIR FLOW` | `Engine::getIntakeFlowRate()` | signal simulé |
+| Admission | `VOLUMETRIC EFF.` | débit réel / débit théorique | signal dérivé |
+| Commande | `THROTTLE` | `Engine::getThrottle()` | état direct |
+| Combustion | `INTAKE AFR` | `Engine::getIntakeAfr()` | signal simulé |
+| Combustion | `EXHAUST O2` | `Engine::getExhaustO2()` | signal simulé |
+| Thermique | huile, pistons, cylindres | `EngineThermalState` | observateur physique V1 |
+| Qualité | `THERMAL INPUT` | validité et anomalies du modèle thermique | diagnostic numérique |
 
-- Meaning: dominant failure vector selected by the model
-- Possible modes:
-  - `BALANCED`
-  - `THERMAL OVERLOAD`
-  - `LUBRICATION BREAKDOWN`
-  - `DETONATION DAMAGE`
-  - `BOTTOM-END FATIGUE`
-  - `RING SEAL WEAR`
-  - `VALVETRAIN FATIGUE`
-  - `HEAD GASKET RISK`
+Aucune de ces valeurs ne provient d'un générateur aléatoire. Les aiguilles ont une animation amortie pour la lisibilité, mais leur cible reste la valeur du snapshot ; cette animation ne modifie pas la donnée affichée.
 
-The model picks the dominant mode from a set of weighted scores combining instantaneous margins and accumulated subsystem damage.
+## 5. Télémétrie commune
 
-### Top Damage
+### 5.1 Régime moteur
 
-- Meaning: subsystem with the highest accumulated damage right now
-- Purpose: tells you what is already most degraded
+La vitesse angulaire interne $\omega$ est convertie en tours par minute :
 
-### Top Stress
+$$
+N_{rpm}=\frac{60\omega}{2\pi}
+$$
 
-- Meaning: subsystem or operating dimension with the strongest current stress contribution
-- Purpose: tells you what is currently attacking durability the hardest
+Unité UI : `rpm`.
 
-### Oil Temp / Piston Max / Cyl Max
+### 5.2 Vitesse véhicule
 
-- Meaning: physical temperatures published by the thermal observer and used by the wear system
-- `Oil Temp`: mean temperature of the global, perfectly mixed oil node
-- `Piston Max`: highest mean piston temperature among the simulated cylinders
-- `Cyl Max`: highest mean liner/cylinder temperature among the simulated cylinders
-- Purpose: quick thermal context for the focus diagnosis
+La vitesse linéaire interne est convertie vers `mph` ou `kph` selon `ApplicationSettings::speedUnits`. La valeur absolue est affichée afin que la marche arrière ne produise pas une vitesse de cadran négative.
 
-## Operating Margins
+### 5.3 Rapport engagé
 
-This block shows live stress metrics. These are not damage yet. They are the current operating reserves or loads that drive future damage.
+La transmission représente le point mort par `-1`. L'interface affiche donc :
 
-### Thermal Reserve
+$$
+G_{UI}=\begin{cases}
+\mathrm{N} & G=-1\\
+G+1 & G\geq 0
+\end{cases}
+$$
 
-- Meaning: thermal safety margin
-- High is good
-- Low means temperature, pressure, rpm, and duty severity are consuming cooling headroom
+### 5.4 Couple et puissance
 
-### Lube Reserve
+Le couple affiché est `Simulator::getFilteredDynoTorque()`. Il est converti en `Nm` ou `lb-ft` selon la configuration.
 
-- Meaning: lubrication safety margin
-- High is good
-- Low means oil temperature window, load, and fatigue demand are reducing lubrication robustness
+La puissance du banc est calculée par le simulateur :
 
-### Det Reserve
+$$
+P=\tau\omega
+$$
 
-- Meaning: detonation safety margin
-- High is good
-- Low means combustion conditions are nearing knock-prone territory
+Elle est affichée en `kW` ou `hp`. Quand le banc ne charge pas le moteur, le couple et la puissance peuvent légitimement être nuls. Le nouvel écran n'affiche pas automatiquement un ancien pic à la place de la valeur instantanée.
 
-### Fatigue Load
+### 5.5 Pression d'admission
 
-- Meaning: current mechanical fatigue loading
-- High is bad
-- Built from rpm, pressure load, manifold load, and friction load
-- This is closer to a structural duty indicator than a failure indicator
+La pression collecteur est affichée en `kPa abs`. Une pression absolue évite l'ambiguïté entre dépression, pression atmosphérique et suralimentation :
 
-### Comb Stability
+$$
+p_{kPa,abs}=\frac{p_{Pa}}{1000}
+$$
 
-- Meaning: combustion stability margin
-- High is good
-- Low means AFR error, pressure spread, throttle transients, or lean behavior are increasing combustion variability
+### 5.6 Débit d'air
 
-## Accumulated Damage
+`AIR FLOW` convertit le débit d'admission interne vers le débit standard `SCFM` avec le système d'unités existant. Il s'agit du débit fourni par la simulation d'admission, pas d'une mesure de débitmètre.
 
-This block answers: what has already been spent from the engine life budget?
+### 5.7 Rendement volumétrique
 
-Each metric is normalized between `0%` and `100%`.
+Le rendement volumétrique compare le débit molaire réel au débit théorique d'un moteur quatre temps, à la pression et à la température de référence :
 
-### Bottom End
+$$
+\dot n_{th,rev}=\frac{1}{2}\frac{p_{ref}V_d}{RT_{ref}}
+$$
 
-- Scope: crankshaft, rods, mains, bearing support path
-- Driven by:
-  - fatigue load
-  - lubrication degradation
-  - detonation contribution
+$$
+\dot n_{th}=\dot n_{th,rev}\frac{N_{rpm}}{60}
+$$
 
-### Ring Seal
+$$
+\eta_v=\frac{\dot n_{air}}{\dot n_{th}}
+$$
 
-- Scope: piston rings, sealing quality, blow-by related wear
-- Driven by:
-  - thermal stress
-  - detonation stress
-  - combustion instability
-  - pressure load
+avec :
 
-### Valvetrain
+- $p_{ref}=1\ \mathrm{atm}$ ;
+- $T_{ref}=25\ ^\circ\mathrm{C}$ ;
+- $V_d$ la cylindrée totale ;
+- le facteur $1/2$ correspondant à une admission tous les deux tours.
 
-- Scope: cam, followers, springs, seats, valve train fatigue path
-- Driven by:
-  - fatigue load
-  - thermal stress
-  - combustion instability
+À régime nul ou lorsque le débit théorique est numériquement trop faible, l'interface publie `0 %`. Une valeur supérieure à `100 %` reste possible pour un moteur suralimenté ou bénéficiant d'un bon remplissage dynamique.
 
-### Head / Gasket
+## 6. Jauges thermiques
 
-- Scope: head thermal integrity and gasket risk path
-- Driven by:
-  - thermal stress
-  - detonation stress
-  - combustion instability
+### 6.1 Température d'huile
 
-### Lube Sys
+`OIL TEMPERATURE` affiche $T_o$, la température moyenne du nœud global d'huile. Elle se rapproche d'une température moyenne de carter. Elle ne représente ni la température maximale du film au palier, ni celle du jet sous piston.
 
-- Scope: lubrication system degradation and margin erosion
-- Driven by:
-  - lubrication stress
-  - thermal stress
-  - fatigue demand
+### 6.2 Température de piston
 
-## Duty History
+`PISTON TEMPERATURE` affiche :
 
-This block captures operating history that explains why wear is accumulating.
+$$
+T_{p,max}=\max_i(T_{p,i})
+$$
 
-### Overrev
+Chaque $T_{p,i}$ est une température moyenne concentrée du piston. La valeur n'est pas une température locale de calotte ou de gorge de segment.
 
-- Meaning: cumulative time spent near redline / overspeed zone
-- Why it matters: increases inertial loading and fatigue demand
+### 6.3 Température de cylindre
 
-### Overtemp
+`CYLINDER TEMPERATURE` affiche :
 
-- Meaning: cumulative time above critical oil, piston, or cylinder thresholds
-- Why it matters: increases thermal degradation and head/gasket risk
+$$
+T_{c,max}=\max_i(T_{c,i})
+$$
 
-### Cold Load
+Chaque $T_{c,i}$ représente une température moyenne de paroi/liner associée au cylindre. La culasse et le liquide de refroidissement ne sont pas des nœuds séparés en V1.
 
-- Meaning: cumulative time under high load while oil is still cold
-- Why it matters: bad lubrication conditions during high mechanical demand
+### 6.4 Bandes colorées
 
-### Oil Starve
+Les bandes donnent un repère de lecture cohérent, pas une limite constructeur ni une alarme certifiée.
 
-- Meaning: cumulative time with very low lubrication margin
-- Why it matters: can accelerate bearing and bottom-end damage sharply
+| Jauge | Froid | Usuel indicatif | Attention | Élevé |
+|---|---:|---:|---:|---:|
+| Huile | 20–70 °C | 70–120 °C | 120–140 °C | 140–180 °C |
+| Piston moyen | 20–120 °C | 120–300 °C | 300–360 °C | 360–450 °C |
+| Cylindre moyen | 20–70 °C | 70–180 °C | 180–220 °C | 220–300 °C |
 
-### Sev Knock
+Ces seuils sont codés dans `EngineConditionCluster`. Ils devront devenir configurables par moteur avant tout usage de validation.
 
-- Meaning: count of severe knock episodes
-- Why it matters: repeated strong knock events can rapidly damage ring lands, head/gasket, and combustion surfaces
+## 7. Carte thermique par cylindre
 
-### Heat Cyc
+La carte affiche, pour chaque cylindre :
 
-- Meaning: count of thermal cycles detected by the wear model
-- Why it matters: thermal cycling is relevant to long-term fatigue, sealing integrity, and structural durability
+- `PISTON` : $T_{p,i}$ ;
+- `CYLINDER` : $T_{c,i}$ ;
+- `DELTA` : $T_{p,i}-T_{c,i}$.
 
-## How the current model works
+Une différence de température en kelvins est numériquement identique à une différence en degrés Celsius. La ligne contenant le piston le plus chaud ou le cylindre le plus chaud est mise en évidence.
 
-The model combines a physical thermal observer with heuristic wear and durability estimators.
+Jusqu'à six cylindres, la carte utilise une colonne. Au-delà, elle se répartit automatiquement sur deux colonnes. Le modèle thermique conserve un état pour tous les cylindres réellement chargés ; l'interface n'est donc pas limitée au V-Twin malgré le nom du projet.
 
-It uses live simulation signals such as:
+## 8. Point de fonctionnement
 
-- rpm and redline ratio
-- throttle and throttle rate
-- manifold pressure
-- intake AFR
-- per-cylinder pressure
-- per-cylinder temperature
-- chamber friction force and applied friction power
-- dyno load bias
+`OPERATING POINT` complète les grandes valeurs avec quatre signaux utiles au diagnostic :
 
-The thermal observer additionally uses:
+- ouverture du papillon en pourcentage ;
+- AFR d'admission ;
+- oxygène d'échappement en pourcentage ;
+- validité des entrées thermiques.
 
-- piston mass and cylinder bore
-- instantaneous gas pressure, temperature, and chamber volume
-- mean piston speed
-- Hohenberg gas-wall heat transfer
-- calibrated thermal capacities and conductances
+`THERMAL INPUT` vaut :
 
-From those signals it builds:
+- `VALID` si le snapshot thermique est valide et qu'aucune entrée n'a été bornée ;
+- `N ANOMALIES` si le modèle a dû protéger un échantillon physique hors domaine ;
+- `UNAVAILABLE` si le modèle thermique n'est pas initialisé.
 
-- live margins
-- damage rates for each subsystem
-- accumulated normalized damage
-- dominant failure mode
-- engineering exposure counters
+Le compteur d'anomalies est un diagnostic numérique. Il ne doit pas être interprété comme un nombre de défaillances moteur.
 
-Model cadence:
+## 9. Valeurs initiales et absence de fausses données dynamiques
 
-- wear model update: `50 Hz`
-- UI snapshot publication: `10 Hz`
+Au reset, `EngineConditionState` utilise uniquement des valeurs neutres et fixes :
 
-## Reading guidance
+- snapshot invalide ;
+- états système désactivés ;
+- régime, vitesse, couple, puissance, pression, débit et rendement à zéro ;
+- rapport au point mort ;
+- état thermique invalide.
 
-For durability engineering, the intended reading order is:
+Dès qu'un moteur est chargé et qu'une frame est simulée, ces valeurs sont remplacées par les signaux réels. Si le modèle thermique n'est pas disponible, les jauges affichent `NO DATA` au lieu de fabriquer une température.
 
-1. `Health` and `Damage Rate`
-2. `Primary Mode`
-3. `Operating Margins`
-4. `Accumulated Damage`
-5. `Duty History`
+Les anciens calculs dynamiques de `Health`, `RUL`, `Damage Rate`, réserves, modes de défaillance et dommages cumulés ont été supprimés. Le panneau `MODEL COVERAGE` affiche explicitement `WEAR / RUL: NOT CALIBRATED`.
 
-This gives a practical workflow:
+## 10. Limites actuelles
 
-- identify current severity
-- identify the dominant failure vector
-- identify what is currently driving it
-- identify what has already degraded
-- verify the operating history that explains it
+Les seules masses solides thermiquement simulées sont les pistons et les parois de cylindre, avec un nœud global d'huile. Il n'existe actuellement aucun nœud distinct pour :
 
-## Current limitations
+- le liquide de refroidissement ;
+- la culasse ;
+- les soupapes et sièges ;
+- les segments ;
+- les coussinets et paliers ;
+- le collecteur et l'échappement ;
+- le carter d'huile en tant que masse séparée ;
+- un radiateur ou échangeur d'huile explicite.
 
-- oil, piston, and cylinder outputs are simulated temperatures, not fake UI values
-- wear margins, damage rates, accumulated damage, and RUL remain uncalibrated estimators
-- the thermal model is a one-way observer and does not yet replace the fixed gas-wall boundary condition
-- coolant is not simulated because the current V-Twin model has no coolant circuit
-- `Confidence` is currently fixed to `100%`
-- `RUL` is a model projection, not a validated lifetime estimator
-- thresholds and weights are placeholders intended to be replaced or calibrated later
+Le rejet par carter, air, liquide et éventuel échangeur est regroupé dans les conductances équivalentes du modèle thermique. Ce choix permet une V1 exploitable, mais ne permet pas de diagnostiquer quel élément du circuit de refroidissement limite le système.
 
-## Intended future evolution
+Il n'existe pas non plus de pression d'huile, de débit d'huile, de viscosité dépendante de la température, de cliquetis mesuré ou d'historique persistant. Par conséquent, le projet ne calcule actuellement ni :
 
-The current metric package is already shaped for two target use cases:
+- usure de palier ;
+- usure de segment ;
+- fatigue de soupape ;
+- dommage de joint de culasse ;
+- durée de vie restante ;
+- santé globale.
 
-### 1. Prototype durability / constructor use
+## 11. Conditions pour ajouter de vraies métriques d'usure
 
-- direct access to internal simulation signals
-- rich subsystem breakdown
-- failure-mode-oriented diagnosis
+Une nouvelle métrique d'usure ne doit être exposée que si les éléments suivants sont définis :
 
-### 2. Digital twin / OBD-connected engine
+1. pièce ou mécanisme physique concerné ;
+2. signal d'entrée disponible et unité ;
+3. équation, corrélation ou table de dommage traçable ;
+4. paramètres configurables par moteur ;
+5. domaine de validité ;
+6. données d'essai utilisées pour la calibration ;
+7. tests unitaires et tests de non-régression ;
+8. niveau de confiance présenté à l'utilisateur.
 
-- same output metrics
-- lower confidence on inferred metrics
-- stronger distinction between measured and estimated signals
+Exemples d'évolutions pertinentes :
 
-The goal is to keep the same top-level engineering language in both modes, while changing only the data source and the confidence level behind the metrics.
+- modèle de viscosité de type ASTM D341 à partir de la température d'huile ;
+- pression et débit d'huile pour une marge de lubrification ;
+- cycle thermique persistant pour une étude de fatigue calibrée ;
+- température de culasse et pression cylindre maximale pour un indicateur joint/culasse ;
+- compteur d'overspeed fondé sur une limite moteur configurable ;
+- dommage cumulé selon Palmgren-Miner uniquement avec une courbe S-N adaptée à la pièce.
+
+## 12. Vérification
+
+La suite de tests couvre actuellement :
+
+- le rendement volumétrique à l'état de référence ;
+- le rendement nul moteur arrêté ;
+- le coefficient de Hohenberg ;
+- l'équilibre à l'ambiante ;
+- la conservation de l'énergie de frottement ;
+- la symétrie entre cylindres identiques ;
+- la validation des paramètres et de la stabilité numérique ;
+- le comptage des entrées physiques protégées.
+
+Pour valider l'écran manuellement :
+
+1. charger un moteur ;
+2. ouvrir `ENGINE CONDITION` avec `J` ;
+3. vérifier que le régime, le rapport et les états système suivent immédiatement les commandes ;
+4. activer le banc et vérifier couple et puissance ;
+5. observer une chauffe progressive des trois familles de nœuds ;
+6. comparer la carte thermique au nombre de cylindres chargé ;
+7. vérifier qu'un modèle thermique absent affiche `NO DATA`.
+
+## 13. Références
+
+Les références scientifiques et normatives relatives au transfert thermique, aux corrélations de Hohenberg/Woschni, aux huiles et aux essais moteur sont regroupées dans la section 14 de [`ENGINE_THERMAL_MODEL.md`](ENGINE_THERMAL_MODEL.md). Pour un futur modèle d'endommagement, les références devront être spécifiques à la pièce, au matériau, au chargement et à la méthode de calibration retenus.

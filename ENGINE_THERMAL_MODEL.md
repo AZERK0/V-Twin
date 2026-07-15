@@ -11,8 +11,8 @@ Ce document décrit les calculs nécessaires pour estimer, dans V-Twin :
 Il s'appuie sur les signaux réellement disponibles dans la codebase. Il distingue volontairement :
 
 1. la température thermodynamique des gaz déjà calculée par le simulateur ;
-2. les anciennes températures heuristiques du modèle d'usure, conservées ici comme état de référence historique ;
-3. le modèle thermique physique concentré désormais implémenté comme première version.
+2. le modèle thermique physique concentré désormais implémenté comme première version ;
+3. le snapshot de condition qui transmet ces résultats à l'interface sans les recalculer.
 
 Le modèle proposé est une **première version d'estimation**, adaptée à un simulateur temps réel. Il ne constitue ni un calcul de dimensionnement, ni un modèle éléments finis, ni une validation d'un moteur réel. Ses paramètres doivent être calibrés pour chaque moteur.
 
@@ -20,12 +20,12 @@ Le modèle proposé est une **première version d'estimation**, adaptée à un s
 
 La V1 décrite dans ce document est active dans la codebase :
 
-- `EngineThermalParameters` porte une configuration indépendante du modèle d'usure ;
+- `EngineThermalParameters` porte une configuration thermique indépendante ;
 - `EngineThermalModel` accumule les flux à chaque sous-pas fluide et intègre le réseau à $50\ \mathrm{Hz}$ par défaut ;
 - `EngineThermalState` publie les températures par cylindre, les moyennes et les maxima ;
 - `Simulator` construit les propriétés thermiques à partir des pistons, bancs et culasses réellement chargés ;
-- `EngineWearModel` consomme les températures calculées et ne génère plus de températures d'huile ou de refroidissement heuristiques ;
-- `EngineWearCluster` affiche l'huile, le piston le plus chaud et le cylindre le plus chaud ;
+- `EngineConditionModel` publie les températures calculées avec la télémétrie opérationnelle réelle ;
+- `EngineConditionCluster` affiche de grandes jauges et une carte thermique par cylindre ;
 - `engine_thermal_parameters` expose les constantes dans les fichiers `.mr` sans imposer de modification aux assets existants.
 
 L'asset Harley de référence déclare explicitement les valeurs illustratives de la section 10. Les autres moteurs héritent actuellement des mêmes valeurs par défaut : cela assure leur compatibilité, mais ne constitue pas une calibration physique de ces moteurs.
@@ -58,7 +58,7 @@ flowchart LR
     F --> O
 ```
 
-Cette représentation produit des températures moyennes, suffisamment utiles pour le tableau d'usure, les tendances de chauffe et une première détection de surchauffe. Elle ne permet pas de prédire directement la température maximale de la calotte, de la gorge du premier segment ou un point chaud local du liner.
+Cette représentation produit des températures moyennes, suffisamment utiles pour le tableau de condition, les tendances de chauffe et une première détection de surchauffe. Elle ne permet pas de prédire directement la température maximale de la calotte, de la gorge du premier segment ou un point chaud local du liner.
 
 ## 3. Signaux sources et état de référence de la codebase
 
@@ -80,7 +80,7 @@ Les principaux fichiers concernés sont :
 - `src/domain/engine/piston.cpp` ;
 - `src/domain/engine/cylinder_bank.cpp` ;
 - `src/simulation/engine_thermal_model.cpp` et `include/simulation/engine_thermal_model.h` ;
-- `src/simulation/engine_wear_model.cpp` ;
+- `src/simulation/engine_condition_model.cpp` ;
 - `assets/engines/atg-video-1/03_harley_davidson_shovelhead.mr` ;
 - `assets/engines/kohler/kohler_ch750.mr`.
 
@@ -202,87 +202,11 @@ $$
 
 `CombustionChamber::getFrictionForce()` conserve la force avant atténuation pour compatibilité. `getFrictionPower()` applique exactement la même atténuation basse vitesse que la dynamique, puis calcule $|F_{f,appliquée}v_p|$ pour le modèle thermique.
 
-### 3.5 Anciennes températures du modèle d'usure
+### 3.5 Suppression des anciennes sorties heuristiques
 
-Cette sous-section décrit le calcul heuristique remplacé par la V1. Elle permet de comprendre les différences avec les anciennes valeurs d'interface. Le modèle d'usure reste mis à jour toutes les $20\ \mathrm{ms}$, soit à $50\ \mathrm{Hz}$, et construit toujours ses charges de durabilité normalisées entre 0 et 1.
+Les anciennes températures cibles, marges normalisées, dommages cumulés, modes de défaillance et projections de durée de vie ont été supprimés. Ils combinaient des pondérations non calibrées et des constantes de temps beaucoup plus courtes qu'une chauffe réelle. Ils pouvaient donc ressembler à des mesures sans avoir de bilan d'énergie ni de données d'essai pour les valider.
 
-Les variables utilisées ci-dessous correspondent au code actuel :
-
-$$
-L_n=\operatorname{sat}_{[0,1]}\left(\frac{N}{N_{redline}}\right)
-$$
-
-$$
-L_p=\operatorname{sat}_{[0,1]}\left(\frac{p_{max}}{85\ \mathrm{bar}}\right)
-$$
-
-$$
-L_{man}=\operatorname{sat}_{[0,1]}\left(\frac{p_{man}}{1{,}15\ \mathrm{atm}}\right)
-$$
-
-$$
-L_T=\operatorname{sat}_{[0,1]}\left(\frac{\overline T_{g,\,^{\circ}C}-180}{1500}\right)
-$$
-
-$$
-L_f=\operatorname{sat}_{[0,1]}\left(\frac{\overline F_f}{700\ \mathrm{N}}\right)
-$$
-
-$L_{dyno}$ vaut $0{,}08$ lorsque le dynamomètre est activé et 0 sinon. $p_{max}$ est le maximum entre les chambres lors de l'échantillonnage, tandis que les températures et forces sont moyennées entre cylindres.
-
-La charge de fatigue cible est :
-
-$$
-L_{fat}^{*}=\operatorname{sat}_{[0,1]}\left(
-0{,}52L_n^{1{,}7}
-+0{,}28L_p
-+0{,}12L_{man}
-+0{,}08L_f
-\right)
-$$
-
-La sévérité thermique est :
-
-$$
-S_{th}=\operatorname{sat}_{[0,1]}\left(
-0{,}30L_T
-+0{,}24L_p
-+0{,}18L_n
-+0{,}18L_{man}
-+0{,}10L_{dyno}
-\right)
-$$
-
-Les températures cibles sont ensuite :
-
-$$
-T_{coolant}^{*}=82+24S_{th}+6L_{fat}\quad[\ ^\circ\mathrm{C}]
-$$
-
-$$
-T_o^{*}=88+18S_{th}+22L_{fat}\quad[\ ^\circ\mathrm{C}]
-$$
-
-Chaque valeur est lissée par :
-
-$$
-x_{k+1}=x_k+\left(x^{*}-x_k\right)\left(1-e^{-r\Delta t}\right)
-$$
-
-avec $r=1{,}5\ \mathrm{s^{-1}}$ pour le liquide et $r=1{,}3\ \mathrm{s^{-1}}$ pour l'huile. Les constantes de temps équivalentes sont donc environ $0{,}67\ \mathrm{s}$ et $0{,}77\ \mathrm{s}$.
-
-Ces constantes de temps sont beaucoup plus courtes qu'une chauffe réelle de masse d'huile ou de métal. Les valeurs sont initialisées respectivement à $88\ ^\circ\mathrm{C}$ et $94\ ^\circ\mathrm{C}$, même au démarrage d'un moteur froid.
-
-Ces températures sont des indicateurs heuristiques :
-
-- elles ne proviennent pas d'un bilan d'énergie ;
-- elles ne dépendent d'aucune masse d'huile ;
-- elles n'emploient aucune capacité calorifique ;
-- elles ne modélisent aucun débit d'huile ou d'air ;
-- elles ne fournissent pas de température de piston ou de cylindre ;
-- le « coolant » existe même pour les V-Twin à refroidissement par air fournis dans les assets.
-
-Ces deux températures heuristiques ne sont plus calculées ni publiées. Les équations de sévérité, de marge et de dommage restent des estimateurs qualitatifs alimentés par les nouvelles températures physiques.
+La source de vérité thermique est désormais exclusivement `EngineThermalState`. `EngineConditionState` transmet ces valeurs avec les signaux opérationnels directs. Tant qu'un modèle d'usure calibré n'existe pas, l'interface affiche `WEAR / RUL: NOT CALIBRATED` au lieu de générer un indicateur dynamique.
 
 ## 4. Périmètre thermique recommandé pour la V1
 
@@ -666,7 +590,7 @@ Avantages :
 - aucun risque de déstabiliser la combustion et les performances actuelles ;
 - comparaison directe avec les températures heuristiques existantes ;
 - calibration possible avant de modifier le bilan énergétique des chambres ;
-- architecture compatible avec `EngineWearModel` et sa cadence de $50\ \mathrm{Hz}$.
+- architecture compatible avec le snapshot `EngineConditionState`.
 
 Limite : le transfert thermique est compté dans l'observateur alors que le gaz continue d'utiliser sa paroi fixe à $90\ ^\circ\mathrm{C}$. Le bilan d'énergie global n'est donc pas fermé. Cette V1 est un estimateur, pas encore un couplage thermodynamique complet.
 
@@ -690,7 +614,7 @@ Dans la V2, chaque joule retiré aux gaz et attribué au piston ou au cylindre d
 
 ### 8.3 Moyennage des sources rapides
 
-La physique tourne typiquement entre $10$ et $35\ \mathrm{kHz}$ selon le moteur, alors que le modèle d'usure tourne à $50\ \mathrm{Hz}$. Un échantillon instantané de $T_g$ toutes les $20\ \mathrm{ms}$ dépendrait de la position du vilebrequin et provoquerait de l'aliasing.
+La physique tourne typiquement entre $10$ et $35\ \mathrm{kHz}$ selon le moteur, alors que le réseau thermique est intégré à $50\ \mathrm{Hz}$ par défaut. Un échantillon instantané de $T_g$ toutes les $20\ \mathrm{ms}$ dépendrait de la position du vilebrequin et provoquerait de l'aliasing.
 
 Il faut accumuler l'énergie sur tous les pas fluides :
 
@@ -971,17 +895,17 @@ Ces trois dernières valeurs ne sont pas des caractéristiques Toyota mesurées.
 
 ## 11. État des étapes d'implémentation
 
-1. Terminé : structure de paramètres thermiques indépendante du modèle d'usure.
+1. Terminé : structure de paramètres thermiques indépendante de l'interface.
 2. Terminé : états $T_o$, $T_{p,i}$ et $T_{c,i}$ initialisés à l'ambiante.
 3. Terminé : accumulation des flux gaz-paroi et de la puissance de frottement à chaque sous-pas fluide.
 4. Terminé : intégration explicite simultanée à $50\ \mathrm{Hz}$ avec contrôle préalable de stabilité.
 5. Terminé : snapshot contenant les températures par cylindre, leurs moyennes et leurs maxima.
-6. Terminé : alimentation du modèle d'usure et de l'interface avec ces températures.
+6. Terminé : alimentation du snapshot de condition et de l'interface avec ces températures.
 7. Non retenu : l'ancien générateur de températures a été supprimé afin de ne conserver qu'une source de vérité.
 8. À faire : calibration sur des transitoires de chauffe et des points stationnaires mesurés.
 9. Reporté en V2 : remplacement de la paroi gazeuse fixe à $90\ ^\circ\mathrm{C}$ par un couplage énergétique conservatif.
 
-Les températures ne doivent pas être calculées dans la couche UI. L'interface doit uniquement afficher un snapshot produit par la couche simulation, conformément à la séparation déjà appliquée au modèle d'usure.
+Les températures ne doivent pas être calculées dans la couche UI. L'interface affiche uniquement les snapshots `EngineThermalState` et `EngineConditionState` produits par la couche simulation.
 
 ## 12. Vérification et validation
 
@@ -1071,7 +995,7 @@ L'huile n'a actuellement ni débit, ni pompe, ni galerie, ni pression, ni carter
 - la stratification du carter ;
 - un défaut d'alimentation ou de pression.
 
-La température globale reste néanmoins exploitable pour la chauffe, la tendance de viscosité et la marge d'usure.
+La température globale reste néanmoins exploitable pour la chauffe et la tendance de viscosité.
 
 ### 13.4 Température des gaz et transfert actuel
 
