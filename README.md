@@ -22,6 +22,8 @@ It introduces:
 - a published snapshot that keeps simulation data out of rendering code
 - large gauges for oil, hottest-piston, and hottest-cylinder temperatures
 - a per-cylinder thermal map
+- the same interactive 2D engine view used by the analysis screens
+- compact layouts of the existing shared telemetry components
 - direct engine, vehicle, transmission, dyno, intake, and combustion telemetry
 - explicit model coverage and data-quality information
 

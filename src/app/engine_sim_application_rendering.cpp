@@ -12,6 +12,8 @@
 #include "units.h"
 
 void EngineSimApplication::layoutScreen0(const Bounds &windowBounds) {
+    m_rightGaugeCluster->setLayout(RightGaugeCluster::Layout::Standard);
+    m_loadSimulationCluster->setLayout(LoadSimulationCluster::Layout::Standard);
     Grid grid;
     grid.v_cells = 2;
     grid.h_cells = 3;
@@ -64,6 +66,7 @@ void EngineSimApplication::layoutScreen1(const Bounds &windowBounds) {
 }
 
 void EngineSimApplication::layoutScreen2(const Bounds &windowBounds) {
+    m_rightGaugeCluster->setLayout(RightGaugeCluster::Layout::Standard);
     Grid grid;
     grid.v_cells = 1;
     grid.h_cells = 3;
@@ -86,16 +89,28 @@ void EngineSimApplication::layoutScreen2(const Bounds &windowBounds) {
 }
 
 void EngineSimApplication::layoutScreen3(const Bounds &windowBounds) {
-    m_engineView->setDrawFrame(false);
-    m_engineView->setBounds(windowBounds);
+    const Bounds inner = windowBounds.inset(12.0f);
+    const Bounds commonMetrics = inner.verticalSplit(0.72f, 0.91f);
+    const Bounds engineBounds = inner.verticalSplit(0.31f, 0.70f).horizontalSplit(0.0f, 0.39f);
+
+    m_rightGaugeCluster->setLayout(RightGaugeCluster::Layout::CompactCondition);
+    m_loadSimulationCluster->setLayout(LoadSimulationCluster::Layout::CompactCondition);
+    m_rightGaugeCluster->m_bounds = commonMetrics.horizontalSplit(0.40f, 1.0f);
+    m_loadSimulationCluster->m_bounds = commonMetrics.horizontalSplit(0.0f, 0.39f);
+    m_engineView->setDrawFrame(true);
+    m_engineView->setBounds(engineBounds);
+    m_engineView->setLocalPosition({ 0, 0 });
     m_engineConditionCluster->m_bounds = windowBounds;
     m_engineConditionCluster->activate();
+    m_engineView->activate();
+    m_rightGaugeCluster->activate();
+    m_loadSimulationCluster->activate();
 
-    m_engineView->setVisible(false);
-    m_rightGaugeCluster->setVisible(false);
+    m_engineView->setVisible(true);
+    m_rightGaugeCluster->setVisible(true);
     m_oscCluster->setVisible(false);
     m_performanceCluster->setVisible(false);
-    m_loadSimulationCluster->setVisible(false);
+    m_loadSimulationCluster->setVisible(true);
     m_mixerCluster->setVisible(false);
     m_infoCluster->setVisible(false);
     m_engineConditionCluster->setVisible(true);

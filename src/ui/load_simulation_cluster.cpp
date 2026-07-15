@@ -20,6 +20,7 @@ LoadSimulationCluster::LoadSimulationCluster() {
     m_peakTorque = 0.0;
     m_peakHorsepowerRpm = 0.0;
     m_peakTorqueRpm = 0.0;
+    m_layout = Layout::Standard;
     memset(m_systemStatusLights, 0, sizeof(double) * 4);
 }
 
@@ -158,26 +159,44 @@ void LoadSimulationCluster::update(float dt) {
 }
 
 void LoadSimulationCluster::render() {
-    Grid grid;
-    grid.h_cells = 3;
-    grid.v_cells = 2;
+    const bool compact = m_layout == Layout::CompactCondition;
+    setLayoutVisibility(compact);
+    if (compact) {
+        renderCompactCondition();
+    }
+    else {
+        renderStandard();
+    }
 
+    UiElement::render();
+}
+
+void LoadSimulationCluster::renderStandard() {
+    Grid grid{ 3, 2 };
     const Bounds gearBounds = grid.get(m_bounds, 2, 0);
     drawCurrentGear(gearBounds);
-
     const Bounds clutchBounds = grid.get(m_bounds, 1, 0);
     drawClutchPressureGauge(clutchBounds);
-
     const Bounds systemStatusBounds = grid.get(m_bounds, 0, 0);
     drawSystemStatus(systemStatusBounds);
+    updateDynoSpeedGauge(grid.get(m_bounds, 0, 1));
+    updateTorqueGauge(grid.get(m_bounds, 1, 1));
+    updatePowerGauge(grid.get(m_bounds, 2, 1));
+}
 
-    const Bounds dynoSpeedBounds = grid.get(m_bounds, 0, 1);
+void LoadSimulationCluster::renderCompactCondition() {
+    Grid grid{ 4, 1 };
+    drawSystemStatus(grid.get(m_bounds, 0, 0));
+    drawCurrentGear(grid.get(m_bounds, 1, 0));
+    updateTorqueGauge(grid.get(m_bounds, 2, 0));
+    updatePowerGauge(grid.get(m_bounds, 3, 0));
+}
+
+void LoadSimulationCluster::updateDynoSpeedGauge(const Bounds &bounds) {
     m_dynoSpeedGauge->m_gauge->m_value = 
        (float)units::toRpm(std::abs(m_simulator->m_dyno.m_rotationSpeed));
-    m_dynoSpeedGauge->m_bounds = dynoSpeedBounds;
-
+    m_dynoSpeedGauge->m_bounds = bounds;
     Engine *engine = m_simulator->getEngine();
-
     constexpr float shortenAngle = (float)units::angle(1.0, units::deg);
     const double redline = units::toRpm((engine != nullptr) ? engine->getRedline() : 0);
     const double maxRpm = std::floor(redline / 500.0) * 500.0;
@@ -185,20 +204,30 @@ void LoadSimulationCluster::render() {
     m_dynoSpeedGauge->m_gauge->setBandCount(1);
     m_dynoSpeedGauge->m_gauge->setBand(
         { m_app->getRed(), (float)redline, (float)maxRpm, 3.0f, 6.0f, shortenAngle, -shortenAngle }, 0);
+}
 
-    const Bounds torqueBounds = grid.get(m_bounds, 1, 1);
+void LoadSimulationCluster::updateTorqueGauge(const Bounds &bounds) {
     m_torqueGauge->m_gauge->m_value = m_simulator->m_dyno.m_enabled
         ? (float)m_filteredTorque
         : (float)m_peakTorque;
-    m_torqueGauge->m_bounds = torqueBounds;
+    m_torqueGauge->m_bounds = bounds;
+}
 
-    const Bounds horsepowerBounds = grid.get(m_bounds, 2, 1);
+void LoadSimulationCluster::updatePowerGauge(const Bounds &bounds) {
     m_hpGauge->m_gauge->m_value = m_simulator->m_dyno.m_enabled
         ? (float)m_filteredHorsepower
         : (float)m_peakHorsepower;
-    m_hpGauge->m_bounds = horsepowerBounds;
+    m_hpGauge->m_bounds = bounds;
+}
 
-    UiElement::render();
+void LoadSimulationCluster::setLayoutVisibility(bool compact) {
+    m_dynoSpeedGauge->setVisible(!compact);
+    m_clutchPressureGauge->setVisible(!compact);
+    m_torqueGauge->setVisible(true);
+    m_hpGauge->setVisible(true);
+    const float margin = compact ? 5.0f : 10.0f;
+    m_torqueGauge->m_margin = margin;
+    m_hpGauge->m_margin = margin;
 }
 
 void LoadSimulationCluster::drawCurrentGear(const Bounds &bounds) {

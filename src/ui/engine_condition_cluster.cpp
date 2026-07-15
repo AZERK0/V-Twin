@@ -9,7 +9,6 @@
 #include "units.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -111,17 +110,16 @@ void EngineConditionCluster::update(float dt) {
 
 void EngineConditionCluster::render() {
     const Bounds inner = m_bounds.inset(12.0f);
-    drawFrame(m_bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
+    drawFrame(m_bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor(), false);
     renderHeader(inner.verticalSplit(0.93f, 1.0f));
+    const Bounds middle = inner.verticalSplit(0.31f, 0.70f);
+    const Bounds temperatureBounds = middle.horizontalSplit(0.40f, 1.0f);
     if (!m_state.valid) {
-        renderUnavailableState(inner.verticalSplit(0.0f, 0.91f));
+        renderUnavailableState(temperatureBounds);
         return;
     }
 
-    const Bounds top = inner.verticalSplit(0.74f, 0.91f);
-    renderStatusPanel(top.horizontalSplit(0.0f, 0.23f));
-    renderTelemetryPanel(top.horizontalSplit(0.24f, 1.0f));
-    renderTemperaturePanel(inner.verticalSplit(0.31f, 0.72f));
+    renderTemperaturePanel(temperatureBounds);
     const Bounds bottom = inner.verticalSplit(0.0f, 0.29f);
     renderCylinderPanel(bottom.horizontalSplit(0.0f, 0.66f));
     renderOperatingPointPanel(bottom.horizontalSplit(0.67f, 1.0f).verticalSplit(0.52f, 1.0f));
@@ -137,31 +135,9 @@ void EngineConditionCluster::setSimulator(Simulator *simulator) {
 
 void EngineConditionCluster::refreshCachedStrings() {
     m_cachedRevision = m_state.revision;
-    refreshTelemetryStrings();
     refreshTemperatureStrings();
     refreshOperatingPointStrings();
     updateTemperatureGauges();
-}
-
-void EngineConditionCluster::refreshTelemetryStrings() {
-    const auto *settings = m_app->getAppSettings();
-    const double speed = settings->speedUnits == "mph"
-        ? units::convert(std::abs(m_state.vehicleSpeedMetersPerSecond), units::mile / units::hour)
-        : units::convert(std::abs(m_state.vehicleSpeedMetersPerSecond), units::km / units::hour);
-    const double torque = settings->torqueUnits == "Nm"
-        ? units::convert(m_state.torqueNewtonMeters, units::Nm)
-        : units::convert(m_state.torqueNewtonMeters, units::ft_lb);
-    const double power = settings->powerUnits == "kW"
-        ? units::convert(m_state.powerWatts, units::kW)
-        : units::convert(m_state.powerWatts, units::hp);
-    m_engineSpeedText = formatValue(units::toRpm(m_state.engineSpeedRadPerSecond), 0, "rpm");
-    m_vehicleSpeedText = formatValue(speed, 0, settings->speedUnits.c_str());
-    m_gearText = m_state.transmissionGear < 0 ? "N" : std::to_string(m_state.transmissionGear + 1);
-    m_torqueText = formatValue(torque, settings->torqueUnits == "Nm" ? 1 : 0, settings->torqueUnits.c_str());
-    m_powerText = formatValue(power, settings->powerUnits == "kW" ? 1 : 0, settings->powerUnits.c_str());
-    m_manifoldPressureText = formatValue(units::convert(m_state.manifoldPressurePascals, units::kPa), 1, "kPa abs");
-    m_airFlowText = formatValue(units::convert(m_state.intakeFlowRate, units::scfm), 1, "SCFM");
-    m_volumetricEfficiencyText = formatValue(m_state.volumetricEfficiency * 100.0, 1, "%");
 }
 
 void EngineConditionCluster::refreshTemperatureStrings() {
@@ -210,50 +186,6 @@ void EngineConditionCluster::renderHeader(const Bounds &bounds) {
     }
     drawAlignedText(engineName, inner, 18.0f, Bounds::center, Bounds::center);
     drawAlignedText("PHYSICAL TELEMETRY  //  [J] ANALYSIS", inner, 16.0f, Bounds::rm, Bounds::rm);
-}
-
-void EngineConditionCluster::renderStatusPanel(const Bounds &bounds) {
-    drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
-    const Bounds inner = bounds.inset(8.0f);
-    drawText("SYSTEM STATUS", inner.verticalSplit(0.82f, 1.0f), 15.0f, Bounds::tl);
-    const Bounds body = inner.verticalSplit(0.0f, 0.76f);
-    Grid grid{ 2, 2 };
-    renderStatusTile(grid.get(body, 0, 0).inset(2.0f), "IGNITION", m_state.ignitionEnabled);
-    renderStatusTile(grid.get(body, 1, 0).inset(2.0f), "STARTER", m_state.starterEnabled);
-    renderStatusTile(grid.get(body, 0, 1).inset(2.0f), "DYNO", m_state.dynamometerEnabled);
-    renderStatusTile(grid.get(body, 1, 1).inset(2.0f), "HOLD", m_state.dynamometerHoldEnabled,
-        m_state.dynamometerHoldEnabled && !m_state.dynamometerEnabled);
-}
-
-void EngineConditionCluster::renderStatusTile(
-    const Bounds &bounds,
-    const std::string &label,
-    bool active,
-    bool standby)
-{
-    const ysVector color = standby ? m_app->getOrange() : m_app->getGreen();
-    const ysVector fill = active
-        ? mix(color, m_app->getBackgroundColor(), 0.78f)
-        : mix(m_app->getForegroundColor(), m_app->getBackgroundColor(), 0.96f);
-    drawFrame(bounds, 1.0f, active ? color : m_app->getForegroundColor(), fill);
-    drawText(label, bounds.inset(6.0f).verticalSplit(0.58f, 1.0f), 12.0f, Bounds::tl);
-    drawAlignedText(standby ? "STANDBY" : (active ? "ON" : "OFF"), bounds.inset(6.0f), 15.0f,
-        Bounds::br, Bounds::br);
-}
-
-void EngineConditionCluster::renderTelemetryPanel(const Bounds &bounds) {
-    Grid grid{ 4, 2 };
-    const std::string *values[] = {
-        &m_engineSpeedText, &m_vehicleSpeedText, &m_gearText, &m_powerText,
-        &m_torqueText, &m_manifoldPressureText, &m_airFlowText, &m_volumetricEfficiencyText
-    };
-    const char *labels[] = {
-        "ENGINE SPEED", "VEHICLE SPEED", "GEAR", "POWER",
-        "TORQUE", "MANIFOLD PRESSURE", "AIR FLOW", "VOLUMETRIC EFF."
-    };
-    for (int i = 0; i < 8; ++i) {
-        renderValueTile(grid.get(bounds, i % 4, i / 4).inset(2.0f), labels[i], *values[i]);
-    }
 }
 
 void EngineConditionCluster::renderValueTile(

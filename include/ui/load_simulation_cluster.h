@@ -8,6 +8,11 @@
 
 class LoadSimulationCluster : public UiElement {
     public:
+        enum class Layout {
+            Standard,
+            CompactCondition
+        };
+
         LoadSimulationCluster();
         virtual ~LoadSimulationCluster();
 
@@ -19,6 +24,7 @@ class LoadSimulationCluster : public UiElement {
         void setUnits();
 
         void setSimulator(Simulator *simulator) { m_simulator = simulator; }
+        void setLayout(Layout layout) { m_layout = layout; }
 
     private:
         Transmission *getTransmission() const { return m_simulator->getTransmission(); }
@@ -28,6 +34,12 @@ class LoadSimulationCluster : public UiElement {
         void drawClutchPressureGauge(const Bounds &bounds);
         void drawSystemStatus(const Bounds &bounds);
         void updateHpAndTorque(float dt);
+        void renderStandard();
+        void renderCompactCondition();
+        void updateDynoSpeedGauge(const Bounds &bounds);
+        void updateTorqueGauge(const Bounds &bounds);
+        void updatePowerGauge(const Bounds &bounds);
+        void setLayoutVisibility(bool compact);
         bool isIgnitionOn() const;
 
         float m_systemStatusLights[4];
@@ -48,6 +60,7 @@ class LoadSimulationCluster : public UiElement {
         std::string m_torqueUnits;
 
         Simulator *m_simulator;
+        Layout m_layout;
 };
 
 #endif /* ATG_ENGINE_SIM_LOAD_SIMULATION_CLUSTER_H */

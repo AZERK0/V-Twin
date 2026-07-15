@@ -29,6 +29,7 @@ RightGaugeCluster::RightGaugeCluster() {
     m_throttleDisplay = nullptr;
     m_fuelCluster = nullptr;
     m_isAbsolute = false;
+    m_layout = Layout::Standard;
 }
 
 RightGaugeCluster::~RightGaugeCluster() {
@@ -181,15 +182,37 @@ void RightGaugeCluster::update(float dt) {
 }
 
 void RightGaugeCluster::render() {
-    drawFrame(m_bounds, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
-
-    const Bounds tachSpeedCluster = m_bounds.verticalSplit(0.5f, 1.0f);
-    renderTachSpeedCluster(tachSpeedCluster);
-
-    const Bounds fuelAirCluster = m_bounds.verticalSplit(0.0f, 0.5f);
-    renderFuelAirCluster(fuelAirCluster);
+    const bool compact = m_layout == Layout::CompactCondition;
+    setLayoutVisibility(compact);
+    if (compact) {
+        renderCompactCondition();
+    }
+    else {
+        renderStandard();
+    }
 
     UiElement::render();
+}
+
+void RightGaugeCluster::renderStandard() {
+    drawFrame(m_bounds, 1.0, m_app->getForegroundColor(), m_app->getBackgroundColor());
+    const Bounds tachSpeedCluster = m_bounds.verticalSplit(0.5f, 1.0f);
+    renderTachSpeedCluster(tachSpeedCluster);
+    const Bounds fuelAirCluster = m_bounds.verticalSplit(0.0f, 0.5f);
+    renderFuelAirCluster(fuelAirCluster);
+}
+
+void RightGaugeCluster::renderCompactCondition() {
+    const Bounds primary = m_bounds.verticalSplit(0.5f, 1.0f);
+    const Bounds air = m_bounds.verticalSplit(0.0f, 0.5f);
+    Grid primaryGrid{ 2, 1 };
+    Grid airGrid{ 3, 1 };
+    updateTachometer(primaryGrid.get(primary, 0, 0));
+    updateSpeedometer(primaryGrid.get(primary, 1, 0));
+    updateAirGauges(
+        airGrid.get(air, 0, 0),
+        airGrid.get(air, 1, 0),
+        airGrid.get(air, 2, 0));
 }
 
 void RightGaugeCluster::setEngine(Engine *engine) {
@@ -199,11 +222,14 @@ void RightGaugeCluster::setEngine(Engine *engine) {
 void RightGaugeCluster::renderTachSpeedCluster(const Bounds &bounds) {
     const Bounds left = bounds.horizontalSplit(0.0f, 0.5f);
     const Bounds right = bounds.horizontalSplit(0.5f, 1.0f);
+    updateTachometer(left.verticalSplit(0.5f, 1.0f));
+    updateSpeedometer(left.verticalSplit(0.0f, 0.5f));
+    m_combustionChamberStatus->m_bounds = right;
+}
 
-    const Bounds tach = left.verticalSplit(0.5f, 1.0f);
-    m_tachometer->m_bounds = tach;
-    m_tachometer->m_gauge->m_value = (float)std::abs(getRpm());
-
+void RightGaugeCluster::updateTachometer(const Bounds &bounds) {
+    m_tachometer->m_bounds = bounds;
+    m_tachometer->m_gauge->m_value = static_cast<float>(std::abs(getRpm()));
     constexpr float shortenAngle = (float)units::angle(1.0, units::deg);
     const float maxRpm =
         (float)std::ceil(units::toRpm(getRedline() * 1.25) / 1000.0) * 1000.0f;
@@ -219,16 +245,13 @@ void RightGaugeCluster::renderTachSpeedCluster(const Bounds &bounds) {
         { m_app->getOrange(), redlineWarning, redline, 3.0f, 6.0f, -shortenAngle, shortenAngle }, 1);
     m_tachometer->m_gauge->setBand(
         { m_app->getRed(), redline, maxRpm, 3.0f, 6.0f, shortenAngle, -shortenAngle }, 2);
+}
 
-    const Bounds speed = left.verticalSplit(0.0f, 0.5f);
-    m_speedometer->m_bounds = speed;
-
+void RightGaugeCluster::updateSpeedometer(const Bounds &bounds) {
+    m_speedometer->m_bounds = bounds;
     m_speedometer->m_gauge->m_value = (m_speedUnits == "mph") 
         ? (float)units::convert(std::abs(getSpeed()), units::mile / units::hour) 
         : (float)units::convert(std::abs(getSpeed()), units::km / units::hour);
-
-
-    m_combustionChamberStatus->m_bounds = right;
 }
 
 void RightGaugeCluster::renderFuelAirCluster(const Bounds &bounds) {
@@ -245,44 +268,74 @@ void RightGaugeCluster::renderFuelAirCluster(const Bounds &bounds) {
     const Bounds fuelConsumption = fuelSection.horizontalSplit(0.5f, 1.0f);
     m_fuelCluster->m_bounds = fuelConsumption;
 
+    Grid grid = { 1, 3 };
+    updateAirGauges(
+        grid.get(right, 0, 0),
+        grid.get(right, 0, 1),
+        grid.get(right, 0, 2));
+}
+
+void RightGaugeCluster::updateAirGauges(
+    const Bounds &manifoldBounds,
+    const Bounds &airFlowBounds,
+    const Bounds &volumetricEfficiencyBounds)
+{
+    updateManifoldGauge(manifoldBounds);
+    const double intakeFlowRate = getFiniteIntakeFlowRate();
+    m_intakeCfmGauge->m_bounds = airFlowBounds;
+    m_intakeCfmGauge->m_gauge->m_value =
+        static_cast<float>(units::convert(intakeFlowRate, units::scfm));
+    m_volumetricEffGauge->m_bounds = volumetricEfficiencyBounds;
+    m_volumetricEffGauge->m_gauge->m_value =
+        100.0f * static_cast<float>(calculateVolumetricEfficiency(intakeFlowRate));
+}
+
+void RightGaugeCluster::updateManifoldGauge(const Bounds &bounds) {
+    constexpr double ambientPressure = units::pressure(1.0, units::atm);
+    m_manifoldVacuumGauge->m_bounds = bounds;
+    const double vacuumReading = getManifoldPressureWithUnits(ambientPressure);
+    m_manifoldVacuumGauge->m_gauge->m_value = m_isAbsolute || vacuumReading <= -0.5
+        ? static_cast<float>(vacuumReading)
+        : 0.0f;
+}
+
+double RightGaugeCluster::getFiniteIntakeFlowRate() const {
+    const double intakeFlowRate = m_engine == nullptr
+        ? 0.0
+        : m_engine->getIntakeFlowRate();
+    return std::isfinite(intakeFlowRate) ? intakeFlowRate : 0.0;
+}
+
+double RightGaugeCluster::calculateVolumetricEfficiency(double intakeFlowRate) const {
     constexpr double ambientPressure = units::pressure(1.0, units::atm);
     constexpr double ambientTemperature = units::celcius(25.0);
-
-    Grid grid = { 1, 3 };
-    const Bounds manifoldVacuum = grid.get(right, 0, 0, 1, 1);
-    m_manifoldVacuumGauge->m_bounds = manifoldVacuum;
-
-    const double vacuumReading = getManifoldPressureWithUnits(ambientPressure);
-    if (m_isAbsolute) {
-        m_manifoldVacuumGauge->m_gauge->m_value = static_cast<float>(vacuumReading);
-    }
-    else {
-        m_manifoldVacuumGauge->m_gauge->m_value = (vacuumReading > -0.5)
-            ? 0.0f
-            : static_cast<float>(vacuumReading);
-    }
-
     const double rpm = std::fmax(getRpm(), 0.0);
     const double theoreticalAirPerRevolution = (m_engine == nullptr)
         ? 0.0
         : 0.5 * (ambientPressure * m_engine->getDisplacement())
             / (constants::R * ambientTemperature);
     const double theoreticalAirPerSecond = theoreticalAirPerRevolution * rpm / 60.0;
-    const double actualAirPerSecond = (m_engine == nullptr)
+    return std::abs(theoreticalAirPerSecond) < 1E-3
         ? 0.0
-        : m_engine->getIntakeFlowRate();
-    const double volumetricEfficiency = (std::abs(theoreticalAirPerSecond) < 1E-3)
-        ? 0.0
-        : (actualAirPerSecond / theoreticalAirPerSecond);
+        : intakeFlowRate / theoreticalAirPerSecond;
+}
 
-    const Bounds cfmBounds = grid.get(right, 0, 1, 1, 1);
-    m_intakeCfmGauge->m_bounds = cfmBounds;
-    m_intakeCfmGauge->m_gauge->m_value =
-        (float)units::convert(actualAirPerSecond, units::scfm);
-
-    const Bounds volumetricEfficiencyBounds = grid.get(right, 0, 2, 1, 1);
-    m_volumetricEffGauge->m_bounds = volumetricEfficiencyBounds;
-    m_volumetricEffGauge->m_gauge->m_value = 100.0f * (float)volumetricEfficiency;
+void RightGaugeCluster::setLayoutVisibility(bool compact) {
+    m_tachometer->setVisible(true);
+    m_speedometer->setVisible(true);
+    m_manifoldVacuumGauge->setVisible(true);
+    m_intakeCfmGauge->setVisible(true);
+    m_volumetricEffGauge->setVisible(true);
+    m_combustionChamberStatus->setVisible(!compact);
+    m_throttleDisplay->setVisible(!compact);
+    m_afrCluster->setVisible(!compact);
+    m_fuelCluster->setVisible(!compact);
+    const float margin = compact ? 5.0f : 10.0f;
+    m_tachometer->m_margin = margin;
+    m_speedometer->m_margin = margin;
+    m_manifoldVacuumGauge->m_margin = margin;
+    m_intakeCfmGauge->m_margin = margin;
+    m_volumetricEffGauge->m_margin = margin;
 }
 
 double RightGaugeCluster::getManifoldPressureWithUnits(double ambientPressure) {

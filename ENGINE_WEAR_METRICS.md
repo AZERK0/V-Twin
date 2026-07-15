@@ -25,6 +25,10 @@ La fonctionnalité est séparée en trois responsabilités :
 2. `EngineConditionModel` construit un snapshot cohérent des états moteur, véhicule, transmission, banc et thermique.
 3. `EngineConditionCluster` convertit les unités, compose les libellés et dessine l'écran sans inventer de donnée métier.
 
+Les métriques communes ne possèdent pas de second rendu spécifique à cet écran. `RightGaugeCluster` et `LoadSimulationCluster`, déjà utilisés par l'écran principal, proposent un layout compact et réemploient les mêmes instances de `LabeledGauge`, leurs unités, leurs bandes colorées et leur amortissement d'aiguille. Le dashboard thermique ne dessine donc plus de copies textuelles de ces valeurs.
+
+La représentation mécanique est également la même instance d'`EngineView` que dans les autres vues. Elle conserve le rendu animé du moteur, le déplacement par glisser-déposer, le zoom à la molette et la sélection de couche existante.
+
 `EngineConditionState` est publié à la fin de chaque frame de simulation. Il contient des valeurs brutes dans les unités internes et une copie du dernier `EngineThermalState`. La révision du snapshot permet à l'interface de ne reformater les chaînes que lorsqu'une nouvelle valeur est disponible.
 
 Cette structure permet d'ajouter plus tard une famille de métriques sans coupler son calcul au rendu. Un futur modèle d'usure devra publier son propre état validé ou étendre le snapshot de condition, mais ses équations resteront dans la couche simulation.
@@ -43,9 +47,9 @@ La touche `J` bascule directement entre l'analyse moteur et l'écran de conditio
 L'écran de condition est organisé dans l'ordre de lecture suivant :
 
 - identité du moteur et nature des données ;
-- états `Ignition`, `Starter`, `Dyno` et `Hold` ;
-- télémétrie opérationnelle commune ;
-- trois grandes jauges thermiques ;
+- états `Ignition`, `Starter`, `Dyno` et `Hold`, rapport, couple et puissance dans le composant compact du banc ;
+- régime, vitesse, pression collecteur, débit d'air et rendement volumétrique dans les jauges compactes communes ;
+- vue moteur 2D interactive à côté des trois grandes jauges thermiques ;
 - carte thermique par cylindre ;
 - point de fonctionnement instantané ;
 - périmètre et limites du modèle.
@@ -296,9 +300,10 @@ Pour valider l'écran manuellement :
 2. ouvrir `ENGINE CONDITION` avec `J` ;
 3. vérifier que le régime, le rapport et les états système suivent immédiatement les commandes ;
 4. activer le banc et vérifier couple et puissance ;
-5. observer une chauffe progressive des trois familles de nœuds ;
-6. comparer la carte thermique au nombre de cylindres chargé ;
-7. vérifier qu'un modèle thermique absent affiche `NO DATA`.
+5. vérifier que le moteur 2D s'anime, se déplace à la souris et zoome à la molette ;
+6. observer une chauffe progressive des trois familles de nœuds ;
+7. comparer la carte thermique au nombre de cylindres chargé ;
+8. vérifier qu'un modèle thermique absent affiche `NO DATA`.
 
 ## 13. Références
 

@@ -24,15 +24,11 @@ public:
 
 private:
     void refreshCachedStrings();
-    void refreshTelemetryStrings();
     void refreshTemperatureStrings();
     void refreshOperatingPointStrings();
     void updateTemperatureGauges();
 
     void renderHeader(const Bounds &bounds);
-    void renderStatusPanel(const Bounds &bounds);
-    void renderStatusTile(const Bounds &bounds, const std::string &label, bool active, bool standby = false);
-    void renderTelemetryPanel(const Bounds &bounds);
     void renderValueTile(const Bounds &bounds, const std::string &label, const std::string &value);
     void renderTemperaturePanel(const Bounds &bounds);
     void renderTemperatureTile(
@@ -57,14 +53,6 @@ private:
     EngineConditionState m_state;
     std::uint64_t m_cachedRevision;
 
-    std::string m_engineSpeedText;
-    std::string m_vehicleSpeedText;
-    std::string m_gearText;
-    std::string m_powerText;
-    std::string m_torqueText;
-    std::string m_manifoldPressureText;
-    std::string m_airFlowText;
-    std::string m_volumetricEfficiencyText;
     std::string m_oilTemperatureText;
     std::string m_pistonTemperatureText;
     std::string m_cylinderTemperatureText;
