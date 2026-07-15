@@ -50,6 +50,7 @@ void CombustionChamber::initialize(const Parameters &params) {
     m_fuel = params.fuel;
     m_crankcasePressure = params.CrankcasePressure;
     m_meanPistonSpeedToTurbulence = params.MeanPistonSpeedToTurbulence;
+    m_frictionModel = params.FrictionModel;
 
     m_pistonSpeed = new double[StateSamples];
     m_pressure = new double[StateSamples];

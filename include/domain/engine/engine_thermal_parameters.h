@@ -1,6 +1,7 @@
 #ifndef ATG_ENGINE_SIM_ENGINE_THERMAL_PARAMETERS_H
 #define ATG_ENGINE_SIM_ENGINE_THERMAL_PARAMETERS_H
 
+#include "domain/engine/engine_cooling_parameters.h"
 #include "units.h"
 
 #include <cmath>
@@ -27,6 +28,7 @@ struct EngineThermalParameters {
     double hohenbergCoefficient = 130.0;
     double maximumHeatTransferCoefficientWPerM2K = 5000.0;
     double updateIntervalSeconds = 0.02;
+    EngineCoolingParameters cooling;
 
     bool isValid() const {
         const double frictionFractionSum = pistonFrictionHeatFraction
@@ -40,6 +42,7 @@ struct EngineThermalParameters {
             && isPositive(oilSpecificHeatJPerKgK)
             && conductancesAreValid()
             && heatTransferParametersAreValid()
+            && cooling.isValid()
             && std::abs(frictionFractionSum - 1.0) <= 1e-9;
     }
 

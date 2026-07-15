@@ -95,6 +95,43 @@ public node engine_thermal_parameters {
     input hohenberg_coefficient: 130.0;
     input maximum_heat_transfer_coefficient: 5000 * units.J / (units.sec * units.m2 * units.K);
     input update_interval: 0.02 * units.sec;
+
+    input air_reference_speed: 30 * units.m / units.sec;
+    input air_speed_exponent: 0.6;
+    input maximum_air_speed: 70 * units.m / units.sec;
+    input cylinder_forced_air_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+
+    input sump_thermal_capacity: 0 * units.J / units.K;
+    input oil_sump_conductance: 0 * units.J / (units.sec * units.K);
+    input sump_natural_air_conductance: 0 * units.J / (units.sec * units.K);
+    input sump_forced_air_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+
+    input oil_cooler_natural_air_conductance: 0 * units.J / (units.sec * units.K);
+    input oil_cooler_forced_air_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+    input oil_thermostat_start_temperature: 80 * units.C + units.K0;
+    input oil_thermostat_full_open_temperature: 90 * units.C + units.K0;
+
+    input coolant_thermal_capacity: 0 * units.J / units.K;
+    input cylinder_coolant_static_conductance: 0 * units.J / (units.sec * units.K);
+    input cylinder_coolant_pumped_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+    input oil_coolant_static_conductance: 0 * units.J / (units.sec * units.K);
+    input oil_coolant_pumped_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+    input radiator_natural_air_conductance: 0 * units.J / (units.sec * units.K);
+    input radiator_forced_air_conductance_at_reference: 0 * units.J / (units.sec * units.K);
+    input radiator_ram_air_speed_factor: 0.85;
+    input coolant_thermostat_start_temperature: 82 * units.C + units.K0;
+    input coolant_thermostat_full_open_temperature: 95 * units.C + units.K0;
+    input fan_turn_on_temperature: 95 * units.C + units.K0;
+    input fan_full_speed_temperature: 105 * units.C + units.K0;
+    input fan_maximum_air_speed: 8 * units.m / units.sec;
+
+    input coolant_pump_reference_speed: 3000 * units.rpm;
+    input oil_pump_reference_speed: 3000 * units.rpm;
+    input pump_speed_exponent: 0.8;
+    input coolant_pump_minimum_factor: 0.0;
+    input coolant_pump_maximum_factor: 1.5;
+    input oil_pump_minimum_factor: 0.0;
+    input oil_pump_maximum_factor: 1.5;
 }
 
 private node _engine => __engine_sim__engine {
@@ -114,6 +151,11 @@ private node _engine => __engine_sim__engine {
     input hf_gain [float];
     input jitter [float];
     input noise [float];
+
+    input piston_friction_coefficient [float];
+    input piston_breakaway_friction [float];
+    input piston_breakaway_friction_velocity [float];
+    input piston_viscous_friction_coefficient [float];
 
     input thermal_ambient_temperature [float];
     input thermal_piston_specific_heat [float];
@@ -136,6 +178,38 @@ private node _engine => __engine_sim__engine {
     input thermal_hohenberg_coefficient [float];
     input thermal_maximum_transfer_coefficient [float];
     input thermal_update_interval [float];
+    input thermal_air_reference_speed [float];
+    input thermal_air_speed_exponent [float];
+    input thermal_maximum_air_speed [float];
+    input thermal_cylinder_forced_air_conductance [float];
+    input thermal_sump_capacity [float];
+    input thermal_oil_sump_conductance [float];
+    input thermal_sump_natural_air_conductance [float];
+    input thermal_sump_forced_air_conductance [float];
+    input thermal_oil_cooler_natural_air_conductance [float];
+    input thermal_oil_cooler_forced_air_conductance [float];
+    input thermal_oil_thermostat_start_temperature [float];
+    input thermal_oil_thermostat_full_open_temperature [float];
+    input thermal_coolant_capacity [float];
+    input thermal_cylinder_coolant_static_conductance [float];
+    input thermal_cylinder_coolant_pumped_conductance [float];
+    input thermal_oil_coolant_static_conductance [float];
+    input thermal_oil_coolant_pumped_conductance [float];
+    input thermal_radiator_natural_air_conductance [float];
+    input thermal_radiator_forced_air_conductance [float];
+    input thermal_radiator_ram_air_speed_factor [float];
+    input thermal_coolant_thermostat_start_temperature [float];
+    input thermal_coolant_thermostat_full_open_temperature [float];
+    input thermal_fan_turn_on_temperature [float];
+    input thermal_fan_full_speed_temperature [float];
+    input thermal_fan_maximum_air_speed [float];
+    input thermal_coolant_pump_reference_speed [float];
+    input thermal_oil_pump_reference_speed [float];
+    input thermal_pump_speed_exponent [float];
+    input thermal_coolant_pump_minimum_factor [float];
+    input thermal_coolant_pump_maximum_factor [float];
+    input thermal_oil_pump_minimum_factor [float];
+    input thermal_oil_pump_maximum_factor [float];
 
     alias output __out [engine_channel];
 }
@@ -160,6 +234,10 @@ public node engine {
     input hf_gain: 0.01;
     input jitter: 0.5;
     input noise: 1.0;
+    input piston_friction_coefficient: 0.06;
+    input piston_breakaway_friction: 50 * units.N;
+    input piston_breakaway_friction_velocity: 0.1 * units.m / units.sec;
+    input piston_viscous_friction_coefficient: 20 * units.N * units.sec / units.m;
     input thermal: engine_thermal_parameters();
 
     alias output __out [_engine]:
@@ -181,6 +259,11 @@ public node engine {
             jitter: jitter,
             noise: noise,
 
+            piston_friction_coefficient: piston_friction_coefficient,
+            piston_breakaway_friction: piston_breakaway_friction,
+            piston_breakaway_friction_velocity: piston_breakaway_friction_velocity,
+            piston_viscous_friction_coefficient: piston_viscous_friction_coefficient,
+
             thermal_ambient_temperature: thermal.ambient_temperature,
             thermal_piston_specific_heat: thermal.piston_specific_heat,
             thermal_cylinder_capacity: thermal.cylinder_thermal_capacity,
@@ -201,7 +284,39 @@ public node engine {
             thermal_cylinder_transfer_factor: thermal.cylinder_gas_heat_transfer_factor,
             thermal_hohenberg_coefficient: thermal.hohenberg_coefficient,
             thermal_maximum_transfer_coefficient: thermal.maximum_heat_transfer_coefficient,
-            thermal_update_interval: thermal.update_interval
+            thermal_update_interval: thermal.update_interval,
+            thermal_air_reference_speed: thermal.air_reference_speed,
+            thermal_air_speed_exponent: thermal.air_speed_exponent,
+            thermal_maximum_air_speed: thermal.maximum_air_speed,
+            thermal_cylinder_forced_air_conductance: thermal.cylinder_forced_air_conductance_at_reference,
+            thermal_sump_capacity: thermal.sump_thermal_capacity,
+            thermal_oil_sump_conductance: thermal.oil_sump_conductance,
+            thermal_sump_natural_air_conductance: thermal.sump_natural_air_conductance,
+            thermal_sump_forced_air_conductance: thermal.sump_forced_air_conductance_at_reference,
+            thermal_oil_cooler_natural_air_conductance: thermal.oil_cooler_natural_air_conductance,
+            thermal_oil_cooler_forced_air_conductance: thermal.oil_cooler_forced_air_conductance_at_reference,
+            thermal_oil_thermostat_start_temperature: thermal.oil_thermostat_start_temperature,
+            thermal_oil_thermostat_full_open_temperature: thermal.oil_thermostat_full_open_temperature,
+            thermal_coolant_capacity: thermal.coolant_thermal_capacity,
+            thermal_cylinder_coolant_static_conductance: thermal.cylinder_coolant_static_conductance,
+            thermal_cylinder_coolant_pumped_conductance: thermal.cylinder_coolant_pumped_conductance_at_reference,
+            thermal_oil_coolant_static_conductance: thermal.oil_coolant_static_conductance,
+            thermal_oil_coolant_pumped_conductance: thermal.oil_coolant_pumped_conductance_at_reference,
+            thermal_radiator_natural_air_conductance: thermal.radiator_natural_air_conductance,
+            thermal_radiator_forced_air_conductance: thermal.radiator_forced_air_conductance_at_reference,
+            thermal_radiator_ram_air_speed_factor: thermal.radiator_ram_air_speed_factor,
+            thermal_coolant_thermostat_start_temperature: thermal.coolant_thermostat_start_temperature,
+            thermal_coolant_thermostat_full_open_temperature: thermal.coolant_thermostat_full_open_temperature,
+            thermal_fan_turn_on_temperature: thermal.fan_turn_on_temperature,
+            thermal_fan_full_speed_temperature: thermal.fan_full_speed_temperature,
+            thermal_fan_maximum_air_speed: thermal.fan_maximum_air_speed,
+            thermal_coolant_pump_reference_speed: thermal.coolant_pump_reference_speed,
+            thermal_oil_pump_reference_speed: thermal.oil_pump_reference_speed,
+            thermal_pump_speed_exponent: thermal.pump_speed_exponent,
+            thermal_coolant_pump_minimum_factor: thermal.coolant_pump_minimum_factor,
+            thermal_coolant_pump_maximum_factor: thermal.coolant_pump_maximum_factor,
+            thermal_oil_pump_minimum_factor: thermal.oil_pump_minimum_factor,
+            thermal_oil_pump_maximum_factor: thermal.oil_pump_maximum_factor
         );
 }
 

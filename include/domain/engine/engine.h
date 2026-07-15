@@ -46,6 +46,7 @@ class Engine : public Part {
             double initialNoise;
             double initialJitter;
 
+            CombustionChamber::FrictionModelParams pistonFrictionParameters;
             EngineThermalParameters thermalParameters;
         };
 

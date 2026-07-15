@@ -244,7 +244,12 @@ void Simulator::updateEngineThermalModel(double dt) {
         sample.meanPistonSpeedMPerS = chamber->calculateMeanPistonSpeed();
         sample.frictionPowerW = chamber->getFrictionPower();
     }
-    m_engineThermalModel.update(m_cylinderThermalSamples, dt);
+    EngineThermalOperatingPoint operatingPoint;
+    operatingPoint.engineSpeedRadPerSecond = m_engine->getSpeed();
+    operatingPoint.vehicleSpeedMPerS = m_vehicle != nullptr
+        ? m_vehicle->getSpeed()
+        : 0.0;
+    m_engineThermalModel.update(m_cylinderThermalSamples, operatingPoint, dt);
 }
 
 void Simulator::initializeEngineThermalModel() {

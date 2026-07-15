@@ -123,6 +123,7 @@ namespace es_script {
             ccParams.StartingPressure = units::pressure(1.0, units::atm);
             ccParams.StartingTemperature = units::celcius(25.0);
             ccParams.MeanPistonSpeedToTurbulence = meanPistonSpeedToTurbulence;
+            ccParams.FrictionModel = parameters.pistonFrictionParameters;
 
             for (int i = 0; i < engine->getCylinderCount(); ++i) {
                 ccParams.piston = engine->getPiston(i);
@@ -164,6 +165,7 @@ namespace es_script {
             addInput("hf_gain", &m_parameters.initialHighFrequencyGain);
             addInput("jitter", &m_parameters.initialJitter);
             addInput("noise", &m_parameters.initialNoise);
+            registerFrictionInputs();
             registerThermalInputs();
 
             ObjectReferenceNode<EngineNode>::registerInputs();
@@ -192,6 +194,61 @@ namespace es_script {
             addInput("thermal_hohenberg_coefficient", &thermal.hohenbergCoefficient);
             addInput("thermal_maximum_transfer_coefficient", &thermal.maximumHeatTransferCoefficientWPerM2K);
             addInput("thermal_update_interval", &thermal.updateIntervalSeconds);
+            registerCoolingInputs();
+        }
+
+        void registerFrictionInputs() {
+            auto &friction = m_parameters.pistonFrictionParameters;
+            addInput("piston_friction_coefficient", &friction.frictionCoeff);
+            addInput("piston_breakaway_friction", &friction.breakawayFriction);
+            addInput("piston_breakaway_friction_velocity", &friction.breakawayFrictionVelocity);
+            addInput("piston_viscous_friction_coefficient", &friction.viscousFrictionCoefficient);
+        }
+
+        void registerCoolingInputs() {
+            auto &cooling = m_parameters.thermalParameters.cooling;
+            addInput("thermal_air_reference_speed", &cooling.airReferenceSpeedMPerS);
+            addInput("thermal_air_speed_exponent", &cooling.airSpeedExponent);
+            addInput("thermal_maximum_air_speed", &cooling.maximumAirSpeedMPerS);
+            addInput("thermal_cylinder_forced_air_conductance", &cooling.cylinderForcedAirConductanceAtReferenceWPerK);
+            addInput("thermal_sump_capacity", &cooling.sumpThermalCapacityJPerK);
+            addInput("thermal_oil_sump_conductance", &cooling.oilSumpConductanceWPerK);
+            addInput("thermal_sump_natural_air_conductance", &cooling.sumpNaturalAirConductanceWPerK);
+            addInput("thermal_sump_forced_air_conductance", &cooling.sumpForcedAirConductanceAtReferenceWPerK);
+            addInput("thermal_oil_cooler_natural_air_conductance", &cooling.oilCoolerNaturalAirConductanceWPerK);
+            addInput("thermal_oil_cooler_forced_air_conductance", &cooling.oilCoolerForcedAirConductanceAtReferenceWPerK);
+            addInput("thermal_oil_thermostat_start_temperature", &cooling.oilThermostatStartTemperatureK);
+            addInput("thermal_oil_thermostat_full_open_temperature", &cooling.oilThermostatFullOpenTemperatureK);
+            registerCoolantInputs();
+            registerPumpInputs();
+        }
+
+        void registerCoolantInputs() {
+            auto &cooling = m_parameters.thermalParameters.cooling;
+            addInput("thermal_coolant_capacity", &cooling.coolantThermalCapacityJPerK);
+            addInput("thermal_cylinder_coolant_static_conductance", &cooling.cylinderCoolantStaticConductanceWPerK);
+            addInput("thermal_cylinder_coolant_pumped_conductance", &cooling.cylinderCoolantPumpedConductanceAtReferenceWPerK);
+            addInput("thermal_oil_coolant_static_conductance", &cooling.oilCoolantStaticConductanceWPerK);
+            addInput("thermal_oil_coolant_pumped_conductance", &cooling.oilCoolantPumpedConductanceAtReferenceWPerK);
+            addInput("thermal_radiator_natural_air_conductance", &cooling.radiatorNaturalAirConductanceWPerK);
+            addInput("thermal_radiator_forced_air_conductance", &cooling.radiatorForcedAirConductanceAtReferenceWPerK);
+            addInput("thermal_radiator_ram_air_speed_factor", &cooling.radiatorRamAirSpeedFactor);
+            addInput("thermal_coolant_thermostat_start_temperature", &cooling.coolantThermostatStartTemperatureK);
+            addInput("thermal_coolant_thermostat_full_open_temperature", &cooling.coolantThermostatFullOpenTemperatureK);
+            addInput("thermal_fan_turn_on_temperature", &cooling.fanTurnOnTemperatureK);
+            addInput("thermal_fan_full_speed_temperature", &cooling.fanFullSpeedTemperatureK);
+            addInput("thermal_fan_maximum_air_speed", &cooling.fanMaximumAirSpeedMPerS);
+        }
+
+        void registerPumpInputs() {
+            auto &cooling = m_parameters.thermalParameters.cooling;
+            addInput("thermal_coolant_pump_reference_speed", &cooling.coolantPumpReferenceSpeedRadPerSecond);
+            addInput("thermal_oil_pump_reference_speed", &cooling.oilPumpReferenceSpeedRadPerSecond);
+            addInput("thermal_pump_speed_exponent", &cooling.pumpSpeedExponent);
+            addInput("thermal_coolant_pump_minimum_factor", &cooling.coolantPumpMinimumFactor);
+            addInput("thermal_coolant_pump_maximum_factor", &cooling.coolantPumpMaximumFactor);
+            addInput("thermal_oil_pump_minimum_factor", &cooling.oilPumpMinimumFactor);
+            addInput("thermal_oil_pump_maximum_factor", &cooling.oilPumpMaximumFactor);
         }
 
         virtual void _evaluate() {
